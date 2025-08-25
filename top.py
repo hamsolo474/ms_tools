@@ -1,8 +1,6 @@
 import sys
 import argparse
 
-lines = sys.stdin.read().splitlines()
-
 parser = argparse.ArgumentParser(description=r"""Top""")
 parser.add_argument('quantity',
                     type=int,
@@ -18,6 +16,8 @@ parser.add_argument('--sort',
 
 args = parser.parse_args()
 
+lines = sys.stdin.read().splitlines()
+
 results = False
 try:
     if args.sort:
@@ -31,4 +31,5 @@ try:
 except TypeError as e:
     print(f'{args.top} is not an integer {e}')
 if not results:
+
     print("Program ran correctly but produced no results")
