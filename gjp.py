@@ -88,7 +88,7 @@ parser.add_argument('--not-strict',
 parser.add_argument('--delimeter',
                     type = str,
                     default="\t",
-                    help="which delimiter to use tab, comma, colon etc..")
+                    help="which delimeter to use tab, comma, colon etc..")
 parser.add_argument('--print-headers',
                     action = "store_true",
                     default=False,
@@ -101,7 +101,6 @@ parser.add_argument('--unique-count',
                     action = "store_true",
                     default=False,
                     help="similar to sort | uniq -c ")
-
 
 
 args = parser.parse_args()
@@ -119,6 +118,7 @@ if args.print_headers:
     print(args.delimeter.join(args.fields))
     
 unique = {}
+results = False
 for i in lines:
     try:
         obj = mgparse(i, debug=False)
@@ -126,7 +126,6 @@ for i in lines:
         op = []
         for target in args.fields:
             try:
-                #obj[target]
                 result = obj[target].strip()
                 if len(result) == 0:
                     break
@@ -142,23 +141,20 @@ for i in lines:
                     unique[line] = 1
             else:
                 print(line)
-        #try:
-        #    if len(obj[target].strip()) > 0: print('')
-        #except NameError:
-        #    pass
-            #print('')
-        #if args.space: print('')
+                results = True
     except KeyError:
-        #print('')
         pass
         
 if args.unique == True or args.unique_count == True:
     for k, v in sorted(unique.items(), key=lambda x: x[1], reverse=True):
         if args.unique_count: print(f'{v}', end='\t')
         print(k)
+        results = True
         
 if args.keys:
     print(sorted(set(keys)))
     exit()
 
+if not results:
+    print(f"Program ran correctly but produced no results from this many {len(lines)} lines of input")
 #print(args.unique, args.unique_count)
