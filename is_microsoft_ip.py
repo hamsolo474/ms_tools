@@ -2,6 +2,7 @@ import ipaddress
 import re
 import sys
 import argparse
+import requests
 
 ipv4_regex = re.compile(r'((?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2})')
 ipfile = r"C:\Users\v-micgilmore\Downloads\ServiceTags_Public_20250714.json"
@@ -27,6 +28,12 @@ parser.add_argument(
         action="store_true",
         help="print wireshark display filter"
     )
+parser.add_argument(
+        "--offline-mode",
+        action="store_true",
+        help=f"Read from offline file {ipfile}"
+    )
+
 args = parser.parse_args()
 
 
@@ -38,21 +45,34 @@ def is_ip_in_ranges(ip, ranges):
             return True
     return False
 
-check = sys.stdin.read().splitlines()
+lines = sys.stdin.read().strip().splitlines()
 ip_ranges = ips = set(re.findall(ipv4_regex, filestr))
 results = []
 
-for ip in check:
-    try:
-        result = is_ip_in_ranges(ip, ip_ranges)
-        if result == True and args.mode == 'match':
-            print(f"{ip}")
-            results.append(ip)
-        elif result == False and args.mode == 'notmatch':
-            print(f"{ip}")
-            results.append(ip)
-    except ValueError as e:
-        if args.print_errors:
-            print(e)
+if not args.offline_mode:
+    unique_ips = ','.join(set(lines))
+    print(f'{len(lines)} received {len(set(lines))} unique ips, querying API now...')
+    url = "https://azservicetags.azurewebsites.net//api/iplookup?ipAddresses="+unique_ips
+    response = requests.get(url)
+    assert response.status_code == 200
+
+    for r in response.json():
+        for ip in lines:
+            if r['ipAddress'] == ip and len(r['matchedServiceTags']) > 0:
+                results.append(ip)
+                print(ip) 
+else:
+    for ip in check:
+        try:
+            result = is_ip_in_ranges(ip, ip_ranges)
+            if result == True and args.mode == 'match':
+                print(f"{ip}")
+                results.append(ip)
+            elif result == False and args.mode == 'notmatch':
+                print(f"{ip}")
+                results.append(ip)
+        except ValueError as e:
+            if args.print_errors:
+                print(e)
 if args.wireshark:
     print(' || '.join(['ip.dst == '+i for i in results]))

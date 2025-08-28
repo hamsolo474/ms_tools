@@ -115,4 +115,4 @@ for row in rows:
         results = True
 
 if not results:
-    print('Program ran correctly but returned no results')
+    print(f"Program ran correctly but produced no results from this many {len(lines)} lines of input")
