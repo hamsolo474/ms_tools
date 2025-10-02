@@ -41,7 +41,7 @@ def print_json(data, indent=0):
 
 if __name__ == "__main__":
     try:
-        len(sys.argv[1:])
+        assert len(sys.argv[1:]) > 1
         #parser = argparse.ArgumentParser(description=r"""Read the MS malformed JSON in logs
 #""")
         #parser.add_argument('fields',
@@ -62,7 +62,7 @@ if __name__ == "__main__":
             lines.append(inp)
         lines = '\n'.join(lines)
         lines = gjp.mgsplit(lines, debug=True)
-    except IndexError:
+    except AssertionError:
         lines = gjp.mgsplit(sys.stdin.read(), debug=False)
     #print(lines)
     for line in lines:
