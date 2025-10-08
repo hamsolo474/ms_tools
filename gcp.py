@@ -2,6 +2,9 @@ import csv
 import io
 import sys
 import argparse
+import re
+
+guid_regex = re.compile('([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})')
 
 def csvline(text):
     filename = text.split(':')[0]
@@ -26,55 +29,56 @@ def csvline(text):
             opdic[str(index)] = value
     #renames
     renames = {}
-    if 'QueryExecutionReport' in opdic['filename']:
-        renames = {'2':'constring',
-                   '4':'timestamp',
-                   '6':'type',
-                   '16':'message'}
-        
-    elif 'GatewayErrors' in opdic['filename']:
-        opdic['gwtype'] = opdic['0'].split(':')[0]
-        opdic['level'] = opdic['0'].split(':')[1]
-        opdic['timestamp'] = opdic['0'].split(' ')[2]
-        opdic['hash'] = opdic['7'].split(' ')[0]
-        opdic['message'] = opdic['7'][len(opdic['hash'])+1:]
-        renames = {'1':'activityid',
-                   '2':'rootactivityid',
-                   '3':'activitytype',
-                   '4':'clientactivityid',
-                   '5':'sourceid',
-                   '6':'helperid'}
-        
-    elif 'GatewayInfo' in opdic['filename']:
-        opdic['gwtype'] = opdic['0'].split(' ')[0]
-        opdic['level'] = opdic['0'].split(' ')[1][:-1]
-        opdic['timestamp'] = opdic['0'].split(' ')[4]
-        opdic['hash'] = opdic['7'].split(' ')[0]
-        opdic['message'] = opdic['7'][len(opdic['hash'])+1:]
-        renames = {'1':'activityid',
-                   '2':'rootactivityid',
-                   '3':'activitytype',
-                   '4':'clientactivityid',
-                   '5':'sourceid',
-                   '6':'helperid'}
-    elif 'MashupEvaluationReport' in opdic['filename']:
-        renames = {'1':'GatewayObjectId',
-                   '2':'ConnectionId',
-                   '3':'RequestId',
-                   '4':'QueryTrackingId',
-                   '5':'DataSource',
-                   '6':'TotalRows',
-                   '7':'TotalBytes',
-                   '8':'TotalProcessorTime(ms)',
-                   '9':'EndTimeUTC',
-                   '10':'AverageWorkingSet(byte)',
-                   '11':'MaxWorkingSet(byte)',
-                   '12':'AverageCommit(byte)',
-                   '13':'MaxCommit(byte)',
-                   '14':'MaxPercentProcessorTime',
-                   '15':'AverageIODataBytesPerSecond',
-                   '16':'MaxIODataBytesPerSecond'}
-        
+    try:
+        if 'QueryExecutionReport' in opdic['filename']:
+            renames = {'2':'constring',
+                       '4':'timestamp',
+                       '6':'type',
+                       '16':'message'}
+            
+        elif 'GatewayErrors' in opdic['filename']:
+            opdic['gwtype'] = opdic['0'].split(':')[0]
+            opdic['level'] = opdic['0'].split(':')[1]
+            opdic['timestamp'] = opdic['0'].split(' ')[2]
+            opdic['hash'] = opdic['7'].split(' ')[0]
+            opdic['message'] = opdic['7'][len(opdic['hash'])+1:]
+            renames = {'1':'activityid',
+                       '2':'rootactivityid',
+                       '3':'activitytype',
+                       '4':'clientactivityid',
+                       '5':'sourceid',
+                       '6':'helperid'}
+        elif 'GatewayInfo' in opdic['filename']:
+            opdic['gwtype'] = opdic['0'].split(' ')[0]
+            opdic['level'] = opdic['0'].split(' ')[1][:-1]
+            opdic['timestamp'] = opdic['0'].split(' ')[4]
+            opdic['hash'] = opdic['7'].split(' ')[0]
+            opdic['message'] = opdic['7'][len(opdic['hash'])+1:]
+            renames = {'1':'activityid',
+                       '2':'rootactivityid',
+                       '3':'activitytype',
+                       '4':'clientactivityid',
+                       '5':'sourceid',
+                       '6':'helperid'}
+        elif 'MashupEvaluationReport' in opdic['filename']:
+            renames = {'1':'GatewayObjectId',
+                       '2':'ConnectionId',
+                       '3':'RequestId',
+                       '4':'QueryTrackingId',
+                       '5':'DataSource',
+                       '6':'TotalRows',
+                       '7':'TotalBytes',
+                       '8':'TotalProcessorTime(ms)',
+                       '9':'EndTimeUTC',
+                       '10':'AverageWorkingSet(byte)',
+                       '11':'MaxWorkingSet(byte)',
+                       '12':'AverageCommit(byte)',
+                       '13':'MaxCommit(byte)',
+                       '14':'MaxPercentProcessorTime',
+                       '15':'AverageIODataBytesPerSecond',
+                       '16':'MaxIODataBytesPerSecond'}
+    except IndexError as e:
+        pass
     for k,v in renames.items():
         try:
         #opdic[v] = opdic.pop(k)
@@ -121,6 +125,10 @@ if __name__ == '__main__':
                         action = "store_true",
                         default=False,
                         help="similar to sort | uniq -c ")
+    parser.add_argument('--merge-ids',
+                        action = "store_false",
+                        default=True,
+                        help="run a regex to strip guids, disable to see full string but I would recommend leaving this on and doing another grep to investigate further")
     parser.add_argument('--print-long-lines',
                         action = "store_true",
                         default=False,
@@ -157,8 +165,10 @@ if __name__ == '__main__':
                 except KeyError:
                     pass
             if len(op) == len(args.fields) and not args.keys:
-                line = args.delimeter.join(op)
+                line = args.delimeter.join(op).lower()
                 if args.unique == True or args.unique_count == True:
+                    if args.merge_ids == True:
+                        line = guid_regex.sub('{GUID}', line)
                     try:
                         unique[line] += 1
                     except KeyError:
