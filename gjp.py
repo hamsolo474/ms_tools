@@ -42,17 +42,17 @@ when there is only one open quote left, next close sig is a whole value
                             print(text)
             else: # All opening quotes
                 quotes.append(index)
-    opdic['file'] = text[:text.find('{')].strip()
+    #opdic['file'] = text[:text.find('{')].strip()
     return opdic
 
 def parse(text, debug=False):
     beginning = text.find('{')
-    file = text[:beginning].strip()
-    #try:
-    opdic = json.loads(text[beginning:].strip())
-    #except ValueError:
-    # return mgparse(text)
-    opdic['file'] = file
+    try:
+        opdic = json.loads(text[beginning:].strip())
+    except json.decoder.JSONDecodeError:
+        return mgparse(text)
+    opdic['file'] = text[:beginning].strip()
+    opdic['all'] = text[beginning:]
     return opdic
     
 def mgsplit(text, debug=False):
@@ -117,6 +117,11 @@ C:\Users\v-micgilmore\Documents\Customer\2xxxxxxxxxxxxxx9\PBIDesktopDiagnosticIn
                         action = "store_true",
                         default=False,
                         help="print long lines and do not truncate after 500chars")
+    parser.add_argument('--force-lower',
+                        action = "store_true",
+                        default=False,
+                        help="force lowercase conversion for case insensitivity")
+
 
     args = parser.parse_args()
 
@@ -130,6 +135,8 @@ C:\Users\v-micgilmore\Documents\Customer\2xxxxxxxxxxxxxx9\PBIDesktopDiagnosticIn
 
     if args.delimeter.lower() == 'tab':
         args.delimeter = '\t'
+    if args.force_lower:
+        lines = [i.lower() for i in lines]
     if args.print_headers:
         print(args.delimeter.join(args.fields))
         
