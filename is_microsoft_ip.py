@@ -35,7 +35,7 @@ parser.add_argument(
 parser.add_argument(
         "--offline-mode",
         action="store_true",
-        help=f"Read from offline file {ipfile}"
+        help=f"Read from offline file"
     )
 
 args = parser.parse_args()
@@ -93,6 +93,7 @@ else:
                 print(e)
 if args.wireshark:
     print(' || '.join(['ip.dst == '+i for i in results]))
+
 
 
 
