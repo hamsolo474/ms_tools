@@ -71,9 +71,9 @@ if not args.offline_mode:
                     for i in r['matchedServiceTags']:
                         st+= '\t'+i['serviceTagId']
                 print(ip + st)
-else:    
+else:   
+    ipfile = r"C:\Users\v-micgilmore\Downloads\ServiceTags_Public_20250714.json"
     try:
-        ipfile = r"C:\Users\v-micgilmore\Downloads\ServiceTags_Public_20250714.json"
         with open(ipfile) as f:
             filestr = f.read()
     except FileNotFoundError:
@@ -93,5 +93,6 @@ else:
                 print(e)
 if args.wireshark:
     print(' || '.join(['ip.dst == '+i for i in results]))
+
 
 
