@@ -68,7 +68,7 @@ if not args.offline_mode:
             if r['ipAddress'] == ip and len(r['matchedServiceTags']) > 0:
                 results.append(ip)
                 st = ""
-                if args.print_servicetags:
+                if args.print_service_tags:
                     for i in r['matchedServiceTags']:
                         st+= '\t'+i['serviceTagId']
                 print(ip + st)
