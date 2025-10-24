@@ -24,6 +24,11 @@ parser.add_argument(
         help="print errors"
     )
 parser.add_argument(
+        "--print-service-tags",
+        action="store_true",
+        help="print errors"
+    )
+parser.add_argument(
         "--wireshark",
         action="store_true",
         help="print wireshark display filter"
@@ -46,8 +51,10 @@ def is_ip_in_ranges(ip, ranges):
     return False
 
 lines = sys.stdin.read().strip().splitlines()
+#lines = ["52.123.173.240"]
 ip_ranges = ips = set(re.findall(ipv4_regex, filestr))
 results = []
+#args.print_servicetags = True
 
 if not args.offline_mode:
     unique_ips = ','.join(set(lines))
@@ -60,7 +67,11 @@ if not args.offline_mode:
         for ip in lines:
             if r['ipAddress'] == ip and len(r['matchedServiceTags']) > 0:
                 results.append(ip)
-                print(ip) 
+                st = ""
+                if args.print_servicetags:
+                    for i in r['matchedServiceTags']:
+                        st+= '\t'+i['serviceTagId']
+                print(ip + st)
 else:
     for ip in check:
         try:
