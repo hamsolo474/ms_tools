@@ -78,7 +78,7 @@ else:
             filestr = f.read()
     except FileNotFoundError:
         print(f'{ipfile} not found please edit with new path for offline mode')
-        break
+        exit()
     for ip in check:
         try:
             result = is_ip_in_ranges(ip, ip_ranges)
@@ -93,4 +93,5 @@ else:
                 print(e)
 if args.wireshark:
     print(' || '.join(['ip.dst == '+i for i in results]))
+
 
