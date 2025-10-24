@@ -31,10 +31,24 @@ def csvline(text):
     renames = {}
     try:
         if 'QueryExecutionReport' in opdic['filename']:
-            renames = {'2':'constring',
+            renames = {'0':'GatewayObjectId',
+                       '1':'RequestId',
+                       '3':'QueryTrackingId',
+                       '5':'QueryExecutionDuration', #ms
+                       '7':'DataReadingAndSerializationDuration',
+                       '8':'DataReadingDuration',
+                       '9':'DataSerializationDuration', #ms
+                       '10':'SpoolingDiskWritingDuration', #ms
+                       '11':'SpoolingDiskReadingDuration', #ms
+                       '12':'SpoolingTotalDataSize', #byte
+                       '13':'DataProcessingEndTimeUTC',
+                       '14':'DataProcessingDuration', #ms
+                       '15':'Success',
+                       '2':'constring',
                        '4':'timestamp',
                        '6':'type',
                        '16':'message'}
+            #GatewayObjectId,RequestId,DataSource,QueryTrackingId,QueryExecutionEndTimeUTC,QueryExecutionDuration(ms),QueryType,DataReadingAndSerializationDuration(ms),DataReadingDuration(ms),DataSerializationDuration(ms),SpoolingDiskWritingDuration(ms),SpoolingDiskReadingDuration(ms),SpoolingTotalDataSize(byte),DataProcessingEndTimeUTC,DataProcessingDuration(ms),Success,ErrorMessage
             
         elif 'GatewayErrors' in opdic['filename']:
             opdic['gwtype'] = opdic['0'].split(':')[0]
