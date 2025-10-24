@@ -2,14 +2,13 @@ import ipaddress
 import re
 import sys
 import argparse
-import requests
+try:
+    import requests
+except ModuleNotFoundError: 
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
+    import requests
 
 ipv4_regex = re.compile(r'((?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2})')
-ipfile = r"C:\Users\v-micgilmore\Downloads\ServiceTags_Public_20250714.json"
-
-with open(ipfile) as f:
-    filestr = f.read()
-
 
 parser = argparse.ArgumentParser(description="Get list of IPs from stdin and check to see if they are MS")
 parser.add_argument(
@@ -72,7 +71,14 @@ if not args.offline_mode:
                     for i in r['matchedServiceTags']:
                         st+= '\t'+i['serviceTagId']
                 print(ip + st)
-else:
+else:    
+    try:
+        ipfile = r"C:\Users\v-micgilmore\Downloads\ServiceTags_Public_20250714.json"
+        with open(ipfile) as f:
+            filestr = f.read()
+    except FileNotFoundError:
+        print(f'{ipfile} not found please edit with new path for offline mode')
+        break
     for ip in check:
         try:
             result = is_ip_in_ranges(ip, ip_ranges)
@@ -87,3 +93,4 @@ else:
                 print(e)
 if args.wireshark:
     print(' || '.join(['ip.dst == '+i for i in results]))
+
