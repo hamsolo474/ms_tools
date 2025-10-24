@@ -51,7 +51,6 @@ def is_ip_in_ranges(ip, ranges):
 
 lines = sys.stdin.read().strip().splitlines()
 #lines = ["52.123.173.240"]
-ip_ranges = ips = set(re.findall(ipv4_regex, filestr))
 results = []
 #args.print_servicetags = True
 
@@ -79,6 +78,7 @@ else:
     except FileNotFoundError:
         print(f'{ipfile} not found please edit with new path for offline mode')
         exit()
+    ip_ranges = ips = set(re.findall(ipv4_regex, filestr))
     for ip in check:
         try:
             result = is_ip_in_ranges(ip, ip_ranges)
@@ -93,6 +93,7 @@ else:
                 print(e)
 if args.wireshark:
     print(' || '.join(['ip.dst == '+i for i in results]))
+
 
 
 
