@@ -1,5 +1,9 @@
-import pandas as pd
 import argparse
+try:
+    import pandas as pd
+except ModuleNotFoundError: 
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pandas", "openpyxl"])
+    import pandas as pd
 
 SAP_path = r"SAP.csv"
 try:
