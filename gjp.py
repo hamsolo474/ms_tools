@@ -105,19 +105,19 @@ C:\Users\v-micgilmore\Documents\Customer\2xxxxxxxxxxxxxx9\PBIDesktopDiagnosticIn
                         action = "store_true",
                         default=False,
                         help="Print headers")
-    parser.add_argument('--unique',
+    parser.add_argument('--unique', "-u",
                         action = "store_true",
                         default=False,
                         help="only return unique rows")
-    parser.add_argument('--unique-count', '--count-unique',
+    parser.add_argument('--unique-count', '--count-unique', "-c",
                         action = "store_true",
                         default=False,
                         help="similar to sort | uniq -c ")
-    parser.add_argument('--print-long-lines',
+    parser.add_argument('--print-long-lines', "-p",
                         action = "store_true",
                         default=False,
                         help="print long lines and do not truncate after 500chars")
-    parser.add_argument('--force-lower',
+    parser.add_argument('--force-lower', "-l",
                         action = "store_true",
                         default=False,
                         help="force lowercase conversion for case insensitivity")
@@ -149,10 +149,10 @@ C:\Users\v-micgilmore\Documents\Customer\2xxxxxxxxxxxxxx9\PBIDesktopDiagnosticIn
             op = []
             for target in args.fields:
                 try:
-                    result = obj[target].strip()
+                    result = str(obj[target]).strip()
                     if len(result) == 0:
                         break
-                    op.append(obj[target])
+                    op.append(result)
                 except KeyError:
                     pass
             if len(op) == len(args.fields) and not args.keys:
