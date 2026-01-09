@@ -60,8 +60,8 @@ args = parser.parse_args()
 
 times = []
 if args.start:
-    try: 
-        times.append(datetime.datetime.fromisoformat(args.start.replace("Z", "+00:00")))
+    try:
+        times.append(datetime.datetime.fromisoformat(args.start.upper().replace("Z", "+00:00")))
     except ValueError as e:
         print(f'{args.start} is an invalid timestamp please add timestamp in this format 2025-08-19T05:10:03.1294141Z')
         raise e
@@ -69,8 +69,8 @@ else:
     times.append(datetime.datetime(1980, 1, 1, 1, 1, 1, 129414, tzinfo=datetime.timezone.utc))
 
 if args.end:
-    try: 
-        times.append(datetime.datetime.fromisoformat(args.end.replace("Z", "+00:00")))
+    try:
+        times.append(datetime.datetime.fromisoformat(args.end.upper().replace("Z", "+00:00")))
     except ValueError as e:
         print(f'{args.end} is an invalid timestamp please add timestamp in this format 2025-08-19T05:10:03.1294141Z')
         raise e
@@ -98,7 +98,7 @@ rows = []
 for line in lines:
     try:
         cols = line.split(args.delimeter)
-        time = datetime.datetime.fromisoformat(cols[args.field-1].replace("Z", "+00:00"))
+        time = datetime.datetime.fromisoformat(cols[args.field-1].upper().replace("Z", "+00:00"))
         rows.append([time, line])
     except IndexError as e:
         print(f'ERROR: {line}: with delimeter {args.delimeter} {e}')
@@ -115,4 +115,4 @@ for row in rows:
         results = True
 
 if not results:
-    print(f"Program ran correctly but produced no results from this many {len(lines)} lines of input")
+    print(f"Program ran correctly but produced no results from {len(lines)} lines of input")
