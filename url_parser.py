@@ -6,16 +6,13 @@ import pyperclip
 
 
 class GUIDRow(ttk.Frame):
-    def __init__(self, parent, row_num, label, guid, url_patterns, on_remove, 
-    #on_update, 
-    **kwargs):
+    def __init__(self, parent, row_num, label, guid, url_patterns, on_remove, default_url="Fabric Service Portal", **kwargs):
         super().__init__(parent, **kwargs)
         self.row_num = row_num
         self.guid = guid
         self.url_patterns = url_patterns
         self.on_remove = on_remove
-    #    self.on_update = on_update
-        self.link_var = tk.StringVar(value="Fabric Service Portal")
+        self.link_var = tk.StringVar(value=default_url)
 
         ttk.Label(self, text=str(row_num), width=4).pack(side=tk.LEFT, padx=2)
 
@@ -52,7 +49,6 @@ class GUIDRow(ttk.Frame):
 
     def _on_any_change(self, event=None):
         pass
-        #self.on_update(self)
 
     def get_url(self):
         pattern = self.url_patterns.get(self.link_var.get(), "")
@@ -85,51 +81,53 @@ class URLParserApp:
     }
 
     LABEL_MAPPINGS = {
-        "groups": "Workspace",
-        "lakehouses": "Lakehouse",
-        "lakehouse": "Lakehouse",
-        "lakewarehouses": "Lakehouse",
-        "lakewarehouse": "Lakehouse",
-        "warehouse": "Warehouse",
-        "warehouses": "Warehouse",
-        "pipelines": "Data Pipeline",
-        "pipeline": "Data Pipeline",
-        "notebooks": "Notebook",
-        "notebook": "Notebook",
-        "datasets": "Dataset",
-        "dataset": "Dataset",
-        "reports": "Report",
-        "report": "Report",
-        "dashboards": "Dashboard",
-        "dashboard": "Dashboard",
-        "dataflows": "Dataflow",
-        "dataflow": "Dataflow",
-        "kqldatabases": "KQL Database",
-        "kqldatabase": "KQL Database",
-        "kqldashboards": "KQL Dashboard",
-        "kqldashboard": "KQL Dashboard",
-        "eventhouses": "Eventhouse",
-        "eventhouse": "Eventhouse",
-        "eventstreams": "Eventstream",
-        "eventstream": "Eventstream",
-        "mlExperiments": "ML Experiment",
-        "mlexperiment": "ML Experiment",
-        "mlModels": "ML Model",
-        "mlmodel": "ML Model",
-        "datamarts": "Datamart",
-        "datamart": "Datamart",
-        "databricks": "Databricks",
-        "sqlEndpoints": "SQL Endpoint",
-        "sqlendpoint": "SQL Endpoint",
-        "capacity": "Capacity",
-        "ctid": "Tenant ID",
-        "clientSideAuth": "Client Auth",
+        "groups": ("Workspace", "Fabric Service Portal"),
+        "lakehouses": ("Lakehouse", "Fabric Service Portal"),
+        "lakehouse": ("Lakehouse", "Fabric Service Portal"),
+        "lakewarehouses": ("Lakehouse", "Fabric Service Portal"),
+        "lakewarehouse": ("Lakehouse", "Fabric Service Portal"),
+        "warehouse": ("Warehouse", "Fabric Service Portal"),
+        "warehouses": ("Warehouse", "Fabric Service Portal"),
+        "pipelines": ("Data Pipeline", "Fabric Service Portal"),
+        "pipeline": ("Data Pipeline", "Fabric Service Portal"),
+        "notebooks": ("Notebook", "Fabric Service Portal"),
+        "notebook": ("Notebook", "Fabric Service Portal"),
+        "datasets": ("Dataset", "Fabric Service Portal"),
+        "dataset": ("Dataset", "Fabric Service Portal"),
+        "reports": ("Report", "Fabric Service Portal"),
+        "report": ("Report", "Fabric Service Portal"),
+        "dashboards": ("Dashboard", "Fabric Service Portal"),
+        "dashboard": ("Dashboard", "Fabric Service Portal"),
+        "dataflows": ("Dataflow", "Fabric Service Portal"),
+        "dataflow": ("Dataflow", "Fabric Service Portal"),
+        "kqldatabases": ("KQL Database", "Fabric Service Portal"),
+        "kqldatabase": ("KQL Database", "Fabric Service Portal"),
+        "kqldashboards": ("KQL Dashboard", "Fabric Service Portal"),
+        "kqldashboard": ("KQL Dashboard", "Fabric Service Portal"),
+        "eventhouses": ("Eventhouse", "Fabric Service Portal"),
+        "eventhouse": ("Eventhouse", "Fabric Service Portal"),
+        "eventstreams": ("Eventstream", "Fabric Service Portal"),
+        "eventstream": ("Eventstream", "Fabric Service Portal"),
+        "mlExperiments": ("ML Experiment", "Fabric Service Portal"),
+        "mlexperiment": ("ML Experiment", "Fabric Service Portal"),
+        "mlModels": ("ML Model", "Fabric Service Portal"),
+        "mlmodel": ("ML Model", "Fabric Service Portal"),
+        "datamarts": ("Datamart", "Fabric Service Portal"),
+        "datamart": ("Datamart", "Fabric Service Portal"),
+        "databricks": ("Databricks", "Fabric Service Portal"),
+        "sqlEndpoints": ("SQL Endpoint", "Fabric Service Portal"),
+        "sqlendpoint": ("SQL Endpoint", "Fabric Service Portal"),
+        "capacity": ("Capacity", "Fabric Service Portal"),
+        "ctid": ("Tenant ID", "Fabric Service Portal"),
+        "clientSideAuth": ("Client Auth", "Fabric Service Portal"),
     }
 
     def __init__(self, root):
         self.root = root
         self.root.title("PBI URL Splitter")
         self.root.geometry("900x150")
+        self.root.attributes('-topmost', True)
+        self.root.bind('<Escape>', lambda e: self.root.destroy())
 
         self.guid_rows = []
         self.max_visible_rows = 5
@@ -182,7 +180,7 @@ class URLParserApp:
         self.guid_rows = []
         self._resize_window()
 
-    def _add_row(self, detected_label, display_label, guid):
+    def _add_row(self, detected_label, display_label, guid, default_url="Fabric Service Portal"):
         row = GUIDRow(
             self.rows_frame,
             len(self.guid_rows) + 1,
@@ -190,7 +188,7 @@ class URLParserApp:
             guid,
             self.URL_PATTERNS,
             on_remove=self._remove_row,
-            #on_update=self._update_row
+            default_url=default_url
         )
         row.pack(fill=tk.X, pady=2)
         self.guid_rows.append(row)
@@ -202,9 +200,6 @@ class URLParserApp:
         for i, r in enumerate(self.guid_rows):
             r.row_num = i + 1
         self._resize_window()
-
-    #def _update_row(self, row):
-    #    pass
 
     def _resize_window(self):
         self.root.update_idletasks()
@@ -218,7 +213,10 @@ class URLParserApp:
         self.root.geometry(f"{width}x{height}")
 
     def _get_mapped_label(self, detected_label):
-        return self.LABEL_MAPPINGS.get(detected_label, detected_label)
+        mapping = self.LABEL_MAPPINGS.get(detected_label)
+        if mapping:
+            return mapping[0], mapping[1]
+        return detected_label, "Fabric Service Portal"
 
     def parse_url(self):
         self._clear_rows()
@@ -243,14 +241,14 @@ class URLParserApp:
         for i, part in enumerate(path_parts):
             if self.GUID_PATTERN.match(part):
                 detected_label = path_parts[i - 1] if i > 0 else "path"
-                mapped_label = self._get_mapped_label(detected_label)
-                self._add_row(detected_label, mapped_label, part.lower())
+                mapped_label, default_url = self._get_mapped_label(detected_label)
+                self._add_row(detected_label, mapped_label, part.lower(), default_url)
 
         query_params = urllib.parse.parse_qsl(parsed.query)
         for param_name, param_value in query_params:
             if self.GUID_PATTERN.match(param_value):
-                mapped_label = self._get_mapped_label(param_name)
-                self._add_row(param_name, mapped_label, param_value.lower())
+                mapped_label, default_url = self._get_mapped_label(param_name)
+                self._add_row(param_name, mapped_label, param_value.lower(), default_url)
 
         if not self.guid_rows:
             messagebox.showinfo("No GUIDs", "No GUIDs found in URL")
