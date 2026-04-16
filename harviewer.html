@@ -1,0 +1,2241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HAR Reader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #1c2128;
+      --border: #30363d;
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted: #6e7681;
+      --accent: #58a6ff;
+      --accent-hover: #79b8ff;
+      --status-2xx: #3fb950;
+      --status-3xx: #a371f7;
+      --status-4xx: #d29922;
+      --status-5xx: #f85149;
+      --status-other: #8b949e;
+      --row-hover: rgba(88, 166, 255, 0.08);
+      --row-selected: rgba(88, 166, 255, 0.15);
+      --row-marked: rgba(255, 215, 0, 0.15);
+      --guid-color: #ff7b72;
+      --guid-bg: rgba(255, 123, 114, 0.15);
+      --json-key: #79c0ff;
+      --json-string: #a5d6ff;
+      --json-number: #f2cc60;
+      --json-boolean: #ff7b72;
+      --json-null: #8b949e;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 20px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .file-info {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-left: 16px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-left: auto;
+      position: relative;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: var(--border);
+      border-color: var(--text-muted);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    .drop-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 16px;
+      padding: 40px;
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      margin: 20px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .drop-zone.dragging {
+      border-color: var(--accent);
+      background: rgba(88, 166, 255, 0.05);
+    }
+
+    .drop-zone-icon {
+      font-size: 48px;
+      color: var(--text-muted);
+    }
+
+    .drop-zone-text {
+      font-size: 16px;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    .drop-zone-hint {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .stats {
+      display: flex;
+      gap: 16px;
+      padding: 8px 20px;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+      align-items: center;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .stat-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 4px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-size: 13px;
+    }
+
+    .stat-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .stat-btn-2xx {
+      color: var(--status-2xx);
+      border-color: rgba(63, 185, 80, 0.3);
+    }
+    .stat-btn-2xx:hover {
+      background: rgba(63, 185, 80, 0.1);
+      border-color: var(--status-2xx);
+    }
+
+    .stat-btn-3xx {
+      color: var(--status-3xx);
+      border-color: rgba(163, 113, 247, 0.3);
+    }
+    .stat-btn-3xx:hover {
+      background: rgba(163, 113, 247, 0.1);
+      border-color: var(--status-3xx);
+    }
+
+    .stat-btn-4xx {
+      color: var(--status-4xx);
+      border-color: rgba(210, 153, 34, 0.3);
+    }
+    .stat-btn-4xx:hover {
+      background: rgba(210, 153, 34, 0.1);
+      border-color: var(--status-4xx);
+    }
+
+    .stat-btn-5xx {
+      color: var(--status-5xx);
+      border-color: rgba(248, 81, 73, 0.3);
+    }
+    .stat-btn-5xx:hover {
+      background: rgba(248, 81, 73, 0.1);
+      border-color: var(--status-5xx);
+    }
+
+    .stat-btn.active {
+      border-width: 2px;
+    }
+
+    .stat-btn.active-2xx {
+      background: rgba(63, 185, 80, 0.15);
+      border-color: var(--status-2xx);
+    }
+
+    .stat-btn.active-3xx {
+      background: rgba(163, 113, 247, 0.15);
+      border-color: var(--status-3xx);
+    }
+
+    .stat-btn.active-4xx {
+      background: rgba(210, 153, 34, 0.15);
+      border-color: var(--status-4xx);
+    }
+
+    .stat-btn.active-5xx {
+      background: rgba(248, 81, 73, 0.15);
+      border-color: var(--status-5xx);
+    }
+
+    .stat-btn-json {
+      color: var(--accent);
+      border-color: rgba(88, 166, 255, 0.3);
+    }
+    .stat-btn-json:hover {
+      background: rgba(88, 166, 255, 0.1);
+      border-color: var(--accent);
+    }
+
+    .stat-btn.active-json {
+      background: rgba(88, 166, 255, 0.15);
+      border-color: var(--accent);
+    }
+
+    .stat-btn-clear {
+      color: var(--status-5xx);
+      border-color: rgba(248, 81, 73, 0.3);
+    }
+    .stat-btn-clear:hover {
+      background: rgba(248, 81, 73, 0.1);
+      border-color: var(--status-5xx);
+    }
+
+    .filter-row {
+      display: flex;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .filter-cell {
+      display: flex;
+      align-items: center;
+      padding: 6px 2px;
+      border-right: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .filter-cell > * {
+      flex-shrink: 0;
+    }
+
+    .filter-input {
+      width: 100%;
+      padding: 4px 2px 4px 0;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-primary);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      outline: none;
+    }
+
+    .filter-input:focus {
+      border-color: var(--accent);
+    }
+
+    .filter-input.filter-active {
+      background: rgba(63, 185, 80, 0.15);
+      border-color: var(--status-2xx);
+    }
+
+    .filter-input.filter-exclude {
+      background: rgba(248, 81, 73, 0.15);
+      border-color: var(--status-5xx);
+    }
+
+    .filter-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .filter-hint {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      z-index: 100;
+      display: none;
+      margin-bottom: 4px;
+    }
+
+    .filter-cell:hover .filter-hint {
+      display: block;
+    }
+
+    .columns-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 8px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 0;
+      min-width: 200px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      z-index: 100;
+      display: none;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .columns-dropdown.show {
+      display: block;
+    }
+
+    .columns-dropdown-title {
+      padding: 4px 12px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
+    }
+
+    .column-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-secondary);
+      transition: background 0.1s;
+    }
+
+    .column-item:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .column-item input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 14px;
+      height: 14px;
+    }
+
+    .column-item.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .table-container {
+      flex: 1;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      table-layout: fixed;
+    }
+
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--bg-secondary);
+    }
+
+    th {
+      padding: 10px 8px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    th:hover {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+    }
+
+    th.sorted {
+      color: var(--accent);
+    }
+
+    th .sort-icon {
+      margin-left: 4px;
+      font-size: 10px;
+      opacity: 0.5;
+    }
+
+    th.sorted .sort-icon {
+      opacity: 1;
+    }
+
+    .resize-handle {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 5px;
+      cursor: col-resize;
+      background: transparent;
+      z-index: 10;
+    }
+
+    .resize-handle:hover,
+    .resize-handle.active {
+      background: var(--accent);
+    }
+
+    td {
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      vertical-align: middle;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    tr:hover td {
+      background: var(--row-hover);
+    }
+
+    tr.expanded td {
+      background: var(--row-selected);
+    }
+
+    tr.row-json td {
+      background: rgba(88, 166, 255, 0.04);
+    }
+
+    tr.row-json:hover td {
+      background: rgba(88, 166, 255, 0.12);
+    }
+
+    tr.row-json.expanded td {
+      background: rgba(88, 166, 255, 0.15);
+    }
+
+    tr.row-marked td {
+      background: var(--row-marked);
+    }
+
+    tr.selected td {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    tr.selected.row-json td {
+      background: rgba(88, 166, 255, 0.2);
+    }
+
+    tr.hidden-row td {
+      display: none;
+    }
+
+    tr.detail-row {
+      display: table-row;
+    }
+
+    tr.hidden-row + tr.detail-row {
+      display: none;
+    }
+
+    .col-num { width: 50px; }
+    .col-mark { width: 40px; text-align: center; }
+    .col-hide { width: 40px; text-align: center; }
+    .col-status { width: 65px; }
+    .col-method { width: 70px; }
+    .col-protocol { width: 70px; }
+    .col-host { width: 150px; }
+    .col-path { min-width: 200px; }
+    .col-type { width: 100px; }
+    .col-req-size { width: 90px; }
+    .col-res-size { width: 100px; }
+    .col-start { width: 170px; }
+    .col-duration { width: 80px; }
+    .col-delta { width: 100px; }
+    .col-http { width: 80px; }
+    .col-ip { width: 120px; }
+    .col-content-type { width: 150px; }
+    .col-priority { width: 80px; }
+    .col-connection { width: 80px; }
+    .col-pageref { width: 80px; }
+
+    .cell-mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 36px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+    }
+
+    .status-2xx { background: rgba(63, 185, 80, 0.15); color: var(--status-2xx); }
+    .status-3xx { background: rgba(163, 113, 247, 0.15); color: var(--status-3xx); }
+    .status-4xx { background: rgba(210, 153, 34, 0.15); color: var(--status-4xx); }
+    .status-5xx { background: rgba(248, 81, 73, 0.15); color: var(--status-5xx); }
+    .status-other { background: rgba(139, 148, 158, 0.15); color: var(--status-other); }
+
+    .method {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: rgba(88, 166, 255, 0.1);
+      color: var(--accent);
+    }
+
+    .url-cell {
+      max-width: none;
+    }
+
+    .url-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-primary);
+      cursor: pointer;
+      word-break: break-all;
+      white-space: normal;
+    }
+
+    .url-text:hover {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+
+    .url-host {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .resource-type {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      text-transform: capitalize;
+    }
+
+    .size {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .duration {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-primary);
+    }
+
+    .delta-slow { color: var(--status-5xx); }
+
+    .content-type {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mark-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+
+    .mark-btn:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--text-muted);
+    }
+
+    .mark-btn.marked {
+      background: rgba(255, 215, 0, 0.2);
+      border-color: #ffd700;
+      color: #ffd700;
+    }
+
+    .hide-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+
+    .hide-btn:hover {
+      background: rgba(248, 81, 73, 0.2);
+      border-color: var(--status-5xx);
+      color: var(--status-5xx);
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+
+    .error-message {
+      padding: 16px 20px;
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid var(--status-5xx);
+      border-radius: 6px;
+      margin: 20px;
+      color: var(--status-5xx);
+    }
+
+    .detail-panel {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 8px;
+      padding: 16px;
+    }
+
+    .detail-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .detail-headers {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow: auto;
+    }
+
+    .detail-section {
+      margin-bottom: 16px;
+      overflow: auto;
+    }
+
+    .detail-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .detail-body {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .body-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .body-pane .detail-content {
+      flex: 1;
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .detail-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .detail-content {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: var(--bg-primary);
+      border-radius: 4px;
+      padding: 12px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--text-secondary);
+      overflow-y: auto;
+      flex: 1;
+      max-height: 100%;
+    }
+
+    .json-content {
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre;
+      word-break: normal;
+    }
+
+    .body-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .body-pane .detail-content {
+      flex: 1;
+      overflow: auto;
+    }
+
+    .json-content-wrapper {
+      flex: 1;
+      overflow: auto;
+      min-height: 100px;
+    }
+
+    .image-preview {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-primary);
+      border-radius: 4px;
+      padding: 16px;
+      overflow: auto;
+      min-height: 100px;
+    }
+
+    .image-preview img {
+      max-width: 100%;
+      max-height: 70vh;
+      object-fit: contain;
+      border-radius: 4px;
+    }
+
+    .json-key { color: var(--json-key); }
+    .json-string { color: var(--json-string); }
+    .json-number { color: var(--json-number); }
+    .json-boolean { color: var(--json-boolean); }
+    .json-null { color: var(--json-null); }
+    .json-punctuation { color: var(--text-secondary); }
+
+    .guid {
+      background: var(--guid-bg);
+      color: var(--guid-color);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+
+    .timing-bar {
+      display: flex;
+      height: 8px;
+      background: var(--bg-primary);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .timing-segment {
+      height: 100%;
+      min-width: 2px;
+    }
+
+    .timing-blocked { background: #f85149; }
+    .timing-dns { background: #d29922; }
+    .timing-ssl { background: #a371f7; }
+    .timing-connect { background: #79c0ff; }
+    .timing-send { background: #56d4dd; }
+    .timing-wait { background: #3fb950; }
+    .timing-receive { background: #58a6ff; }
+
+    .body-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 8px;
+      flex-shrink: 0;
+    }
+
+    .body-tab {
+      padding: 4px 12px;
+      font-size: 11px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .body-tab:hover {
+      background: var(--border);
+    }
+
+    .body-tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .keyboard-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 2px 6px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>HAR Reader</h1>
+      <span class="file-info" id="fileInfo"></span>
+      <div class="header-actions">
+        <div style="position: relative;">
+          <button class="btn" id="columnsBtn">
+            <span>☰</span> Columns
+          </button>
+          <div class="columns-dropdown" id="columnsDropdown">
+            <div class="columns-dropdown-title">Visible Columns</div>
+            <div id="columnsList"></div>
+          </div>
+        </div>
+        <button class="btn" id="showFiltersBtn">
+          <span>🔍</span> Toggle Filters
+        </button>
+        <button class="btn btn-primary" id="loadFileBtn">
+          <span>📂</span> Load HAR File
+        </button>
+        <button class="btn" id="clearCacheBtn" style="display: none;">
+          <span>🗑</span> Clear Cache
+        </button>
+      </div>
+      <input type="file" id="fileInput" class="file-input" accept=".har,application/json">
+    </header>
+
+    <div id="dropZone" class="drop-zone">
+      <div class="drop-zone-icon">📋</div>
+      <div class="drop-zone-text">Drop a HAR file here or click to browse</div>
+      <div class="drop-zone-hint">Supports .har files and JSON files</div>
+    </div>
+
+    <div id="content" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+      <div class="stats" id="stats"></div>
+      <div class="filter-row" id="filterRow"></div>
+      <div class="table-container">
+        <table id="table">
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="errorContainer"></div>
+  </div>
+
+  <script>
+    const allColumns = [
+      { key: 'num', label: '#', width: 'col-num', sortable: true, description: 'Row number', resizable: false },
+      { key: 'mark', label: '★', width: 'col-mark', sortable: false, description: 'Mark/Favorite', resizable: false },
+      { key: 'hide', label: '👁', width: 'col-hide', sortable: false, description: 'Hide row', resizable: false },
+      { key: 'status', label: 'Status', width: 'col-status', sortable: true, numeric: true, description: 'HTTP status code' },
+      { key: 'method', label: 'Method', width: 'col-method', sortable: true, description: 'HTTP method (GET, POST, etc.)' },
+      { key: 'protocol', label: 'Protocol', width: 'col-protocol', sortable: true, description: 'Protocol (http/https)' },
+      { key: 'host', label: 'Host', width: 'col-host', sortable: true, description: 'Request host' },
+      { key: 'path', label: 'Path', width: 'col-path', sortable: false, description: 'Request path (without host)' },
+      { key: 'resourceType', label: 'Type', width: 'col-type', sortable: true, description: 'Resource type' },
+      { key: 'requestSize', label: 'Req Size', width: 'col-req-size', sortable: true, numeric: true, unit: 'B', description: 'Request size in bytes' },
+      { key: 'responseSize', label: 'Res Size', width: 'col-res-size', sortable: true, numeric: true, unit: 'B', description: 'Response size in bytes' },
+      { key: 'startedDateTime', label: 'Start Time', width: 'col-start', sortable: true, description: 'Request start time' },
+      { key: 'time', label: 'Duration', width: 'col-duration', sortable: true, numeric: true, unit: 'ms', description: 'Request duration' },
+      { key: 'delta', label: 'Delta', width: 'col-delta', sortable: false, numeric: true, unit: 'ms', description: 'Time since previous request' },
+      { key: 'httpVersion', label: 'HTTP', width: 'col-http', sortable: true, description: 'HTTP version' },
+      { key: 'serverIPAddress', label: 'Server IP', width: 'col-ip', sortable: true, description: 'Server IP address' },
+      { key: 'contentType', label: 'Content Type', width: 'col-content-type', sortable: true, description: 'Response content type' },
+      { key: 'priority', label: 'Priority', width: 'col-priority', sortable: true, description: 'Resource priority' },
+      { key: 'connection', label: 'Connection', width: 'col-connection', sortable: true, description: 'Connection ID' },
+      { key: 'pageref', label: 'Page', width: 'col-pageref', sortable: true, description: 'Page reference' }
+    ];
+
+    let visibleColumns = allColumns.map(c => c.key);
+    let columnWidths = {};
+
+    const columns = allColumns;
+
+    const GUID_REGEX = /"([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})"|([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})|"([0-9a-f]{8}[0-9a-f]{4}[0-9a-f]{4}[0-9a-f]{4}[0-9a-f]{12})"|([0-9a-f]{8}[0-9a-f]{4}[0-9a-f]{4}[0-9a-f]{4}[0-9a-f]{12})|"urn:uuid:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"|urn:uuid:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi;
+
+    function getGuidMatch(match, p1, p2, p3, p4, p5, p6) {
+      return p1 || p2 || p3 || p4 || p5 || p6;
+    }
+
+    let harData = null;
+    let entries = [];
+    let filters = {};
+    let sortColumn = null;
+    let sortDirection = 'asc';
+    let showFilters = true;
+    let expandedRow = null;
+    let selectedRow = null;
+    let currentFilePath = null;
+
+    const dropZone = document.getElementById('dropZone');
+    const content = document.getElementById('content');
+    const fileInput = document.getElementById('fileInput');
+    const loadFileBtn = document.getElementById('loadFileBtn');
+    const showFiltersBtn = document.getElementById('showFiltersBtn');
+    const columnsBtn = document.getElementById('columnsBtn');
+    const columnsDropdown = document.getElementById('columnsDropdown');
+    const columnsList = document.getElementById('columnsList');
+    const stats = document.getElementById('stats');
+    const filterRow = document.getElementById('filterRow');
+    const thead = document.getElementById('thead');
+    const tbody = document.getElementById('tbody');
+    const errorContainer = document.getElementById('errorContainer');
+
+    function parseHar(json) {
+      if (!json.log || !json.log.entries) {
+        throw new Error('Invalid HAR file: missing log.entries');
+      }
+
+      const rawEntries = json.log.entries;
+      let prevTime = null;
+
+      return rawEntries.map((entry, index) => {
+        const request = entry.request || {};
+        const response = entry.response || {};
+        const responseContent = response.content || {};
+        const timings = entry.timings || {};
+
+        const requestSize = (request.headersSize || 0) + (request.bodySize || 0);
+        const responseSize = responseContent.size || 0;
+
+        const startedDateTime = entry.startedDateTime ? new Date(entry.startedDateTime) : null;
+        const time = entry.time || 0;
+
+        let delta = null;
+        if (prevTime !== null && startedDateTime) {
+          delta = startedDateTime - prevTime;
+        }
+        if (startedDateTime) {
+          prevTime = new Date(startedDateTime.getTime() + time);
+        }
+
+        let url = request.url || '';
+        let host = '';
+        let path = '';
+        let protocol = '';
+        try {
+          const urlObj = new URL(url);
+          host = urlObj.hostname;
+          path = urlObj.pathname + urlObj.search;
+          protocol = urlObj.protocol.replace(':', '');
+        } catch (e) {
+          host = url;
+          path = url;
+          protocol = 'http';
+        }
+
+        const status = response.status || 0;
+        const statusClass = status >= 200 && status < 300 ? '2xx' :
+                           status >= 300 && status < 400 ? '3xx' :
+                           status >= 400 && status < 500 ? '4xx' :
+                           status >= 500 ? '5xx' : 'other';
+
+        let responseBodyText = null;
+        try {
+          if (responseContent.text) {
+            if (responseContent.encoding === 'base64') {
+              responseBodyText = atob(responseContent.text);
+            } else {
+              responseBodyText = responseContent.text;
+            }
+          }
+        } catch (e) {
+          responseBodyText = null;
+        }
+
+        const isJson = (responseContent.mimeType?.includes('json') || 
+                      (responseBodyText && responseBodyText.trim().startsWith('{')) ||
+                      (responseBodyText && responseBodyText.trim().startsWith('['))) &&
+                      !url.match(/\.(css|js)(\?|$)/i);
+
+        const isImage = responseContent.mimeType?.startsWith('image/') || 
+                       entry._resourceType === 'image';
+
+        let imageDataUrl = null;
+        if (isImage && responseContent.text) {
+          const mimeType = responseContent.mimeType || 'image/png';
+          if (responseContent.encoding === 'base64') {
+            imageDataUrl = `data:${mimeType};base64,${responseContent.text}`;
+          } else {
+            try {
+              imageDataUrl = `data:${mimeType};base64,${btoa(responseContent.text)}`;
+            } catch (e) {
+              imageDataUrl = null;
+            }
+          }
+        }
+
+        return {
+          num: index + 1,
+          status,
+          statusClass,
+          method: request.method || 'GET',
+          protocol,
+          host,
+          path,
+          url,
+          resourceType: entry._resourceType || 'other',
+          requestSize,
+          responseSize,
+          startedDateTime,
+          startedDateTimeStr: startedDateTime ? formatDateTime(startedDateTime) : '',
+          time,
+          delta,
+          httpVersion: normalizeHttpVersion(request.httpVersion || response.httpVersion || ''),
+          serverIPAddress: entry.serverIPAddress || '-',
+          contentType: responseContent.mimeType || '-',
+          priority: entry._priority || '-',
+          connection: entry.connection || '-',
+          pageref: entry.pageref || '-',
+          raw: entry,
+          timings,
+          responseBodyText,
+          isJson,
+          isImage,
+          imageDataUrl,
+          marked: false,
+          hidden: false
+        };
+      });
+    }
+
+    function normalizeHttpVersion(version) {
+      if (!version) return '-';
+      if (version.includes('2.0') || version === 'h2') return 'HTTP/2';
+      if (version.includes('3.0') || version === 'h3') return 'HTTP/3';
+      if (version === 'http/1.0') return 'HTTP/1.0';
+      if (version.includes('1.1')) return 'HTTP/1.1';
+      return version;
+    }
+
+    function formatDateTime(date) {
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+    }
+
+    function formatSize(bytes) {
+      if (bytes === 0 || bytes < 0) return '-';
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+
+    function formatDuration(ms) {
+      if (!ms || ms < 0) return '-';
+      if (ms < 1000) return ms.toFixed(0) + ' ms';
+      return (ms / 1000).toFixed(2) + ' s';
+    }
+
+    function formatDelta(ms) {
+      if (ms === null || ms === undefined) return '-';
+      if (ms >= 0) return '+' + ms.toFixed(0) + ' ms';
+      return ms.toFixed(0) + ' ms';
+    }
+
+    function encodeStateToUrl() {
+      const params = new URLSearchParams();
+      
+      if (visibleColumns.length < allColumns.length) {
+        params.set('cols', visibleColumns.join(','));
+      }
+      
+      const hash = params.toString();
+      if (hash) {
+        history.replaceState(null, '', '#' + hash);
+      } else {
+        history.replaceState(null, '', window.location.pathname);
+      }
+    }
+    
+    function decodeStateFromUrl() {
+      const hash = window.location.hash.slice(1);
+      if (!hash) return;
+      
+      const params = new URLSearchParams(hash);
+      
+      const cols = params.get('cols');
+      if (cols) {
+        const colList = cols.split(',').filter(c => allColumns.some(ac => ac.key === c));
+        if (colList.length > 0) {
+          const required = ['num', 'mark', 'hide'];
+          visibleColumns = [...new Set([...required, ...colList])];
+        }
+      }
+    }
+    
+    function getStorageKey(filePath) {
+      return 'harReader_' + btoa(encodeURIComponent(filePath)).replace(/[/+=]/g, '_');
+    }
+    
+    function saveStateToStorage(filePath) {
+      const key = getStorageKey(filePath);
+      const state = {
+        filters: { ...filters },
+        markedRows: entries.filter(e => e.marked).map(e => e.num),
+        hiddenRows: entries.filter(e => e.hidden).map(e => e.num)
+      };
+      localStorage.setItem(key, JSON.stringify(state));
+    }
+    
+    function loadStateFromStorage(filePath) {
+      const key = getStorageKey(filePath);
+      const saved = localStorage.getItem(key);
+      if (!saved) return null;
+      
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    const statusDescriptions = {
+      100: 'Continue', 101: 'Switching Protocols',
+      200: 'OK', 201: 'Created', 202: 'Accepted', 204: 'No Content', 206: 'Partial Content',
+      301: 'Moved Permanently', 302: 'Found', 303: 'See Other', 304: 'Not Modified', 307: 'Temporary Redirect', 308: 'Permanent Redirect',
+      400: 'Bad Request', 401: 'Unauthorized', 402: 'Payment Required', 403: 'Forbidden', 404: 'Not Found', 405: 'Method Not Allowed',
+      408: 'Request Timeout', 409: 'Conflict', 410: 'Gone', 413: 'Payload Too Large', 414: 'URI Too Long', 415: 'Unsupported Media Type',
+      422: 'Unprocessable Entity', 429: 'Too Many Requests',
+      500: 'Internal Server Error', 501: 'Not Implemented', 502: 'Bad Gateway', 503: 'Service Unavailable', 504: 'Gateway Timeout'
+    };
+
+    function getStatusDescription(status) {
+      return statusDescriptions[status] || 'Unknown Status';
+    }
+
+    function parseFilter(filterStr) {
+      if (!filterStr || typeof filterStr !== 'string') return { type: 'all', exclude: false, value: null };
+      
+      const trimmed = filterStr.trim();
+      if (!trimmed) return { type: 'all', exclude: false, value: null };
+
+      let exclude = false;
+      let inner = trimmed;
+      
+      if (trimmed.startsWith('-')) {
+        exclude = true;
+        inner = trimmed.slice(1).trim();
+        if (!inner) return { type: 'all', exclude: false, value: null };
+      }
+      
+      if (inner.includes('|')) {
+        const parts = inner.split('|').map(p => p.trim()).filter(p => p);
+        const subFilters = parts.map(p => parseSingleFilter(p));
+        return { type: 'compound', operator: '|', exclude, parts: subFilters };
+      }
+      
+      if (inner.includes('&')) {
+        const parts = inner.split('&').map(p => p.trim()).filter(p => p);
+        const subFilters = parts.map(p => parseSingleFilter(p));
+        return { type: 'compound', operator: '&', exclude, parts: subFilters };
+      }
+      
+      const result = parseSingleFilter(inner);
+      result.exclude = exclude;
+      return result;
+    }
+    
+    function parseSingleFilter(filterStr) {
+      const booleanMatch = filterStr.match(/^(1|y|true)$/i);
+      if (booleanMatch) {
+        return { type: 'boolean', exclude: false, value: true };
+      }
+      
+      const booleanFalseMatch = filterStr.match(/^(0|n|false)$/i);
+      if (booleanFalseMatch) {
+        return { type: 'boolean', exclude: false, value: false };
+      }
+      
+      const opMatch = filterStr.match(/^(>=|<=|>|<|=)?(.+)$/);
+      if (opMatch) {
+        const op = opMatch[1] || null;
+        const val = opMatch[2].trim();
+        
+        if (op) {
+          const numVal = parseFloat(val);
+          if (!isNaN(numVal)) {
+            return { type: 'numeric', exclude: false, operator: op, value: numVal };
+          }
+        }
+        
+        const numVal = parseFloat(filterStr);
+        if (!isNaN(numVal)) {
+          return { type: 'numeric', exclude: false, operator: '=', value: numVal };
+        }
+      }
+      
+      return { type: 'string', exclude: false, value: filterStr };
+    }
+
+    function applyFilter(cellValue, filter, columnKey) {
+      if (filter.type === 'all' && !filter.value) return true;
+      
+      if (filter.type === 'compound') {
+        const results = filter.parts.map(part => applySingleFilter(cellValue, part, columnKey));
+        let matches;
+        if (filter.operator === '|') {
+          matches = results.some(r => r);
+        } else {
+          matches = results.every(r => r);
+        }
+        return filter.exclude ? !matches : matches;
+      }
+      
+      return applySingleFilter(cellValue, filter, columnKey);
+    }
+    
+    function applySingleFilter(cellValue, filter, columnKey) {
+      if (filter.type === 'boolean') {
+        const boolValue = columnKey === 'mark' ? cellValue : !!cellValue;
+        const matches = boolValue === filter.value;
+        return filter.exclude ? !matches : matches;
+      }
+      
+      if (filter.type === 'string') {
+        const strValue = String(cellValue || '').toLowerCase();
+        const filterValue = filter.value.toLowerCase();
+        const matches = strValue.includes(filterValue);
+        return filter.exclude ? !matches : matches;
+      }
+      
+      if (filter.type === 'numeric') {
+        const numValue = Number(cellValue);
+        if (isNaN(numValue)) return filter.exclude;
+        
+        const { operator, value } = filter;
+        let matches;
+        
+        switch (operator) {
+          case '>': matches = numValue > value; break;
+          case '<': matches = numValue < value; break;
+          case '>=': matches = numValue >= value; break;
+          case '<=': matches = numValue <= value; break;
+          case '=': matches = numValue === value; break;
+          default: matches = numValue === value;
+        }
+        
+        return filter.exclude ? !matches : matches;
+      }
+      
+      return true;
+    }
+
+    function getFilteredEntries() {
+      return entries.filter(entry => {
+        if (filters.showJson && !entry.isJson) {
+          return false;
+        }
+        
+        for (const [key, filterValue] of Object.entries(filters)) {
+          if (!filterValue || key === 'showJson') continue;
+          
+          const filter = parseFilter(filterValue);
+          const hasValue = filter.type === 'compound' ? filter.parts.length > 0 : filter.value;
+          if (!hasValue && filter.type === 'all') continue;
+          
+          let cellValue = entry[key];
+          
+          if (key === 'startedDateTime' && entry.startedDateTime) {
+            cellValue = entry.startedDateTime.getTime();
+            const dateFilter = parseFilter(filterValue);
+            
+            if (dateFilter.type === 'string') {
+              const dateStr = entry.startedDateTimeStr.toLowerCase();
+              const matches = dateStr.includes(dateFilter.value.toLowerCase());
+              if (dateFilter.exclude ? matches : !matches) return false;
+            } else if (dateFilter.type === 'numeric' && dateFilter.value) {
+              const filterDate = new Date(dateFilter.value);
+              if (!isNaN(filterDate.getTime())) {
+                const diff = Math.abs(cellValue - filterDate.getTime());
+                const matches = diff < 86400000;
+                if (dateFilter.exclude ? matches : !matches) return false;
+              }
+            }
+            continue;
+          }
+          
+          if (key === 'mark') {
+            if (!applyFilter(cellValue, filter, key)) return false;
+            continue;
+          }
+          
+          const numericCols = ['time', 'requestSize', 'responseSize', 'delta', 'status', 'num'];
+          if (numericCols.includes(key)) {
+            if (!applyFilter(cellValue, filter, key)) return false;
+            continue;
+          }
+          
+          if (typeof cellValue !== 'string') cellValue = String(cellValue || '');
+          if (!applyFilter(cellValue, filter, key)) return false;
+        }
+        return true;
+      });
+    }
+
+    function getSortedEntries(filtered) {
+      if (!sortColumn) return filtered;
+      
+      return [...filtered].sort((a, b) => {
+        let aVal = a[sortColumn];
+        let bVal = b[sortColumn];
+        
+        if (sortColumn === 'startedDateTime') {
+          aVal = a.startedDateTime ? a.startedDateTime.getTime() : 0;
+          bVal = b.startedDateTime ? b.startedDateTime.getTime() : 0;
+        }
+        
+        if (aVal === null || aVal === undefined) aVal = '';
+        if (bVal === null || bVal === undefined) bVal = '';
+        
+        if (typeof aVal === 'string') {
+          const cmp = aVal.localeCompare(bVal);
+          return sortDirection === 'asc' ? cmp : -cmp;
+        }
+        
+        const diff = aVal - bVal;
+        return sortDirection === 'asc' ? diff : -diff;
+      });
+    }
+
+    function renderColumnsDropdown() {
+      columnsList.innerHTML = columns.map(col => {
+        const isVisible = visibleColumns.includes(col.key);
+        return `
+          <label class="column-item" title="${col.description || col.label}">
+            <input type="checkbox" ${isVisible ? 'checked' : ''} 
+                   data-key="${col.key}">
+            <span>${col.label}</span>
+          </label>
+        `;
+      }).join('');
+
+      columnsList.querySelectorAll('input').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const key = e.target.dataset.key;
+          if (e.target.checked) {
+            if (!visibleColumns.includes(key)) {
+              visibleColumns.push(key);
+            }
+          } else {
+            visibleColumns = visibleColumns.filter(k => k !== key);
+          }
+          encodeStateToUrl();
+          renderHeader();
+          renderFilters();
+          syncFilterColumnWidths();
+          renderTable();
+        });
+      });
+    }
+
+    columnsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      renderColumnsDropdown();
+      columnsDropdown.classList.toggle('show');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!columnsDropdown.contains(e.target) && e.target !== columnsBtn) {
+        columnsDropdown.classList.remove('show');
+      }
+    });
+
+    function renderHeader() {
+      const visibleCols = columns.filter(c => visibleColumns.includes(c.key));
+      thead.innerHTML = `
+        <tr>
+          ${visibleCols.map(col => {
+            const isSorted = sortColumn === col.key;
+            const sortIcon = isSorted ? (sortDirection === 'asc' ? '▲' : '▼') : '';
+            const width = columnWidths[col.key] || col.width;
+            return `<th class="${col.width} ${isSorted ? 'sorted' : ''}" data-column="${col.key}" style="width: ${width}">
+              ${col.label}<span class="sort-icon">${sortIcon}</span>
+              ${col.resizable !== false ? '<div class="resize-handle"></div>' : ''}
+            </th>`;
+          }).join('')}
+        </tr>
+      `;
+
+      thead.querySelectorAll('th').forEach(th => {
+        th.addEventListener('click', (e) => {
+          if (e.target.closest('.resize-handle')) return;
+          const column = th.dataset.column;
+          const colDef = columns.find(c => c.key === column);
+          if (!colDef || !colDef.sortable) return;
+
+          if (sortColumn === column) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            sortColumn = column;
+            sortDirection = 'asc';
+          }
+          renderTable();
+        });
+      });
+
+      thead.querySelectorAll('.resize-handle').forEach(handle => {
+        let startX, startWidth;
+        
+        handle.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          startX = e.pageX;
+          const th = handle.closest('th');
+          startWidth = th.offsetWidth;
+          handle.classList.add('active');
+          
+          const onMouseMove = (e) => {
+            const diff = e.pageX - startX;
+            const newWidth = Math.max(40, startWidth + diff);
+            th.style.width = newWidth + 'px';
+            columnWidths[th.dataset.column] = newWidth + 'px';
+          };
+          
+          const onMouseUp = () => {
+            handle.classList.remove('active');
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            syncFilterColumnWidths();
+          };
+          
+          document.addEventListener('mousemove', onMouseMove);
+          document.addEventListener('mouseup', onMouseUp);
+        });
+      });
+    }
+
+    function getFilterHint(col) {
+      const hints = [];
+      hints.push('Press Enter to filter');
+      if (col.numeric) {
+        hints.push('> 100, < 50, >= 10, <= 1000');
+      }
+      if (col.key === 'mark') {
+        hints.push('1, Y, true = marked');
+        hints.push('0, N, false = unmarked');
+      }
+      hints.push('-prefix to exclude');
+      hints.push('Use | for OR, & for AND');
+      return hints.join('<br>');
+    }
+
+    function renderFilters() {
+      const visibleCols = columns.filter(c => visibleColumns.includes(c.key));
+      filterRow.innerHTML = visibleCols.map(col => {
+        const hasFilter = filters[col.key] !== undefined && filters[col.key] !== null && filters[col.key] !== '';
+        const isExclude = hasFilter && String(filters[col.key]).startsWith('-');
+        const width = columnWidths[col.key] || col.width;
+        let placeholder = 'Filter...';
+        if (col.numeric) placeholder = '> < =';
+        if (col.key === 'mark') placeholder = '1/0, Y/N, true/false';
+        const inputClass = hasFilter ? (isExclude ? 'filter-input filter-exclude' : 'filter-input filter-active') : 'filter-input';
+        return `<div class="filter-cell ${col.width}" data-column="${col.key}" style="width: ${width}">
+          <input type="text" 
+                 class="${inputClass}" 
+                 data-column="${col.key}" 
+                 placeholder="${placeholder}"
+                 value="${filters[col.key] || ''}"
+                 title="${col.label} filter">
+          <div class="filter-hint">${getFilterHint(col)}</div>
+        </div>`;
+      }).join('');
+
+      filterRow.querySelectorAll('.filter-input').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            filters[e.target.dataset.column] = e.target.value;
+            if (currentFilePath) saveStateToStorage(currentFilePath);
+            syncFilterColumnWidths();
+            renderTable();
+          }
+        });
+        
+        input.addEventListener('focus', () => {
+          syncFilterColumnWidths();
+        });
+      });
+
+      requestAnimationFrame(() => {
+        syncFilterColumnWidths();
+      });
+    }
+
+    function getCurrentStatusFilter() {
+      const statusFilter = filters.status || '';
+      const parsed = parseFilter(statusFilter);
+      
+      if (parsed.type === 'numeric' && parsed.operator === '=') {
+        const val = parsed.value;
+        if (val >= 200 && val < 300) return '2xx';
+        if (val >= 300 && val < 400) return '3xx';
+        if (val >= 400 && val < 500) return '4xx';
+        if (val >= 500) return '5xx';
+      }
+      
+      if (parsed.type === 'string') {
+        if (parsed.value === '2xx' || parsed.value === '200' || parsed.value === '2') return '2xx';
+        if (parsed.value === '3xx' || parsed.value === '300' || parsed.value === '3') return '3xx';
+        if (parsed.value === '4xx' || parsed.value === '400' || parsed.value === '4') return '4xx';
+        if (parsed.value === '5xx' || parsed.value === '500' || parsed.value === '5') return '5xx';
+      }
+      
+      return null;
+    }
+
+    function renderStats() {
+      const totalRequests = entries.length;
+      const totalSize = entries.reduce((sum, e) => sum + e.responseSize, 0);
+      const totalDuration = entries.length > 0 ? Math.max(...entries.map(e => e.startedDateTime?.getTime() || 0)) - 
+                                       Math.min(...entries.map(e => e.startedDateTime?.getTime() || 0)) : 0;
+      const statusCounts = entries.reduce((acc, e) => {
+        const cat = e.statusClass;
+        acc[cat] = (acc[cat] || 0) + 1;
+        return acc;
+      }, {});
+      
+      const jsonCount = entries.filter(e => e.isJson).length;
+      const currentStatus = getCurrentStatusFilter();
+      const currentJson = filters.showJson === true;
+      const hasActiveFilters = Object.keys(filters).some(k => filters[k]) || sortColumn !== 'startedDateTime' || sortDirection !== 'asc';
+
+      stats.innerHTML = `
+        <div class="stat">Total: <span class="stat-value">${totalRequests}</span></div>
+        <div class="stat">Size: <span class="stat-value">${formatSize(totalSize)}</span></div>
+        <div class="stat">Duration: <span class="stat-value">${formatDuration(totalDuration)}</span></div>
+        <span class="keyboard-hint">J/K to navigate</span>
+        <button class="stat-btn stat-btn-2xx ${currentStatus === '2xx' ? 'active active-2xx' : ''}" data-status="2xx" title="Filter by 2xx status">
+          <span>2xx</span> ✓ <span class="stat-value">${statusCounts['2xx'] || 0}</span>
+        </button>
+        <button class="stat-btn stat-btn-3xx ${currentStatus === '3xx' ? 'active active-3xx' : ''}" data-status="3xx" title="Filter by 3xx status">
+          <span>3xx</span> ↪ <span class="stat-value">${statusCounts['3xx'] || 0}</span>
+        </button>
+        <button class="stat-btn stat-btn-4xx ${currentStatus === '4xx' ? 'active active-4xx' : ''}" data-status="4xx" title="Filter by 4xx status">
+          <span>4xx</span> ⚠ <span class="stat-value">${statusCounts['4xx'] || 0}</span>
+        </button>
+        <button class="stat-btn stat-btn-5xx ${currentStatus === '5xx' ? 'active active-5xx' : ''}" data-status="5xx" title="Filter by 5xx status">
+          <span>5xx</span> ✗ <span class="stat-value">${statusCounts['5xx'] || 0}</span>
+        </button>
+        <button class="stat-btn stat-btn-json ${currentJson ? 'active active-json' : ''}" data-json="true" title="Filter by JSON responses">
+          <span>JSON</span> { } <span class="stat-value">${jsonCount}</span>
+        </button>
+        ${entries.some(e => e.hidden) ? '<button class="stat-btn stat-btn-clear" id="unhideAllBtn" title="Unhide all rows">👁 Unhide All</button>' : ''}
+        ${hasActiveFilters ? '<button class="stat-btn stat-btn-clear" id="clearAllBtn" title="Clear all filters and restore sort by Start Time">✕ Clear All</button>' : ''}
+      `;
+
+      const clearBtn = document.getElementById('clearAllBtn');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+          filters = {};
+          filters.showJson = false;
+          sortColumn = 'startedDateTime';
+          sortDirection = 'asc';
+          if (currentFilePath) saveStateToStorage(currentFilePath);
+          syncFilterColumnWidths();
+          renderTable();
+        });
+      }
+
+      const unhideBtn = document.getElementById('unhideAllBtn');
+      if (unhideBtn) {
+        unhideBtn.addEventListener('click', () => {
+          entries.forEach(entry => {
+            if (entry.hidden) {
+              entry.hidden = false;
+            }
+          });
+          if (currentFilePath) saveStateToStorage(currentFilePath);
+          renderTable();
+        });
+      }
+
+      stats.querySelectorAll('.stat-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const status = btn.dataset.status;
+          const isJson = btn.dataset.json;
+          
+          if (isJson === 'true') {
+            filters.showJson = !filters.showJson;
+          } else if (status) {
+            const current = getCurrentStatusFilter();
+            if (current === status) {
+              filters.status = '';
+            } else {
+              const ranges = {
+                '2xx': '>=200 <300',
+                '3xx': '>=300 <400',
+                '4xx': '>=400 <500',
+                '5xx': '>=500'
+              };
+              filters.status = ranges[status];
+            }
+          }
+          
+          if (currentFilePath) saveStateToStorage(currentFilePath);
+          syncFilterColumnWidths();
+          renderTable();
+        });
+      });
+    }
+
+    function syncFilterColumnWidths() {
+      const headerCells = thead.querySelectorAll('th');
+      const filterCells = filterRow.querySelectorAll('.filter-cell');
+      
+      headerCells.forEach((th, index) => {
+        if (filterCells[index]) {
+          const headerWidth = th.offsetWidth;
+          filterCells[index].style.width = headerWidth + 'px';
+        }
+      });
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function highlightGuids(text) {
+      if (!text) return '';
+      return escapeHtml(text).replace(/<([^>]+)>/g, (match, tagContent) => {
+        return match.replace(/"([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})"/gi, (g, guid) => {
+          return `"<span class="guid">${guid}</span>"`;
+        }).replace(/"([0-9a-f]{8}[0-9a-f]{4}[0-9a-f]{4}[0-9a-f]{4}[0-9a-f]{12})"/gi, (g, guid) => {
+          return `"<span class="guid">${guid}</span>"`;
+        });
+      }).replace(/"([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})"/gi, (match, guid) => {
+        return `"<span class="guid">${guid}</span>"`;
+      }).replace(/"([0-9a-f]{8}[0-9a-f]{4}[0-9a-f]{4}[0-9a-f]{4}[0-9a-f]{12})"/gi, (match, guid) => {
+        return `"<span class="guid">${guid}</span>"`;
+      });
+    }
+
+    function syntaxHighlightJson(json) {
+      if (typeof json !== 'string') {
+        json = JSON.stringify(json, null, 2);
+      }
+      
+      const guidRegex = /"([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})"|"([0-9a-f]{8}[0-9a-f]{4}[0-9a-f]{4}[0-9a-f]{4}[0-9a-f]{12})"|"urn:uuid:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"/gi;
+      
+      const escaped = json
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      
+      const withGuids = escaped.replace(guidRegex, (match) => {
+        return `<span class="guid">${match}</span>`;
+      });
+      
+      const withJson = withGuids.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+        if (match.startsWith('<span class="guid">')) return match;
+        
+        let cls = 'json-number';
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            cls = 'json-key';
+            match = match.replace(/:$/, '');
+            return `<span class="${cls}">${match}</span>:`;
+          } else {
+            cls = 'json-string';
+          }
+        } else if (/true|false/.test(match)) {
+          cls = 'json-boolean';
+        } else if (/null/.test(match)) {
+          cls = 'json-null';
+        }
+        return `<span class="${cls}">${match}</span>`;
+      });
+      
+      return withJson.replace(/([{}\[\],])/g, '<span class="json-punctuation">$1</span>');
+    }
+
+    function renderTable() {
+      const filtered = getFilteredEntries();
+      const sorted = getSortedEntries(filtered);
+      const visibleCols = columns.filter(c => visibleColumns.includes(c.key));
+
+      if (sorted.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="${visibleCols.length}" style="text-align: center; padding: 40px; color: var(--text-muted);">
+              No entries match the current filters
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      let prevDateTime = null;
+      
+      const renderCellForVisible = (entry, key, content) => {
+        if (!visibleColumns.includes(key)) return '';
+        const col = columns.find(c => c.key === key);
+        return `<td class="${col?.width || ''}">${content}</td>`;
+      };
+      
+      tbody.innerHTML = sorted.map(entry => {
+        if (entry.startedDateTime && prevDateTime) {
+          entry.delta = entry.startedDateTime - prevDateTime;
+        }
+        prevDateTime = entry.startedDateTime;
+
+        const isExpanded = expandedRow === entry.num;
+        const isSelected = selectedRow === entry.num;
+        const rowClass = `row${entry.isJson ? ' row-json' : ''}${entry.marked ? ' row-marked' : ''}${isExpanded ? ' expanded' : ''}${isSelected ? ' selected' : ''}${entry.hidden ? ' hidden-row' : ''}`;
+        
+        return `
+          <tr class="${rowClass}" data-num="${entry.num}">
+            ${renderCellForVisible(entry, 'num', `<span class="cell-mono">${entry.num}</span>`)}
+            ${renderCellForVisible(entry, 'mark', `<button class="mark-btn ${entry.marked ? 'marked' : ''}" data-num="${entry.num}" title="Mark/Favorite">${entry.marked ? '★' : '☆'}</button>`)}
+            ${renderCellForVisible(entry, 'hide', `<button class="hide-btn" data-num="${entry.num}" title="Hide row">✕</button>`)}
+            ${renderCellForVisible(entry, 'status', `<span class="status status-${entry.statusClass}" title="${entry.status}: ${getStatusDescription(entry.status)}">${entry.status || '-'}</span>`)}
+            ${renderCellForVisible(entry, 'method', `<span class="method">${entry.method}</span>`)}
+            ${renderCellForVisible(entry, 'protocol', `<span class="cell-mono">${entry.protocol.toUpperCase()}</span>`)}
+            ${renderCellForVisible(entry, 'host', `<span class="cell-mono" title="${escapeHtml(entry.host)}">${escapeHtml(entry.host)}</span>`)}
+            ${renderCellForVisible(entry, 'path', `<span class="cell-mono" title="${escapeHtml(entry.path)}">${escapeHtml(entry.path)}</span>`)}
+            ${renderCellForVisible(entry, 'resourceType', `<span class="resource-type">${entry.resourceType}</span>`)}
+            ${renderCellForVisible(entry, 'requestSize', `<span class="size">${formatSize(entry.requestSize)}</span>`)}
+            ${renderCellForVisible(entry, 'responseSize', `<span class="size">${formatSize(entry.responseSize)}</span>`)}
+            ${renderCellForVisible(entry, 'startedDateTime', `<span class="time">${entry.startedDateTimeStr}</span>`)}
+            ${renderCellForVisible(entry, 'time', `<span class="duration">${formatDuration(entry.time)}</span>`)}
+            ${renderCellForVisible(entry, 'delta', `<span class="duration ${entry.delta !== null && entry.delta >= 500 ? 'delta-slow' : ''}">${formatDelta(entry.delta)}</span>`)}
+            ${renderCellForVisible(entry, 'httpVersion', `<span class="cell-mono">${entry.httpVersion}</span>`)}
+            ${renderCellForVisible(entry, 'serverIPAddress', `<span class="cell-mono">${entry.serverIPAddress}</span>`)}
+            ${renderCellForVisible(entry, 'contentType', `<span class="content-type" title="${escapeHtml(entry.contentType)}">${escapeHtml(entry.contentType)}</span>`)}
+            ${renderCellForVisible(entry, 'priority', `<span class="cell-mono">${entry.priority}</span>`)}
+            ${renderCellForVisible(entry, 'connection', `<span class="cell-mono">${entry.connection}</span>`)}
+            ${renderCellForVisible(entry, 'pageref', `<span class="cell-mono">${entry.pageref}</span>`)}
+          </tr>
+          ${isExpanded ? renderDetailRow(entry, visibleCols.length) : ''}`;
+      }).join('');
+
+      tbody.querySelectorAll('tr[data-num]').forEach(row => {
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.url-text')) return;
+          const num = parseInt(row.dataset.num);
+          expandedRow = expandedRow === num ? null : num;
+          selectedRow = num;
+          renderTable();
+        });
+      });
+
+      tbody.querySelectorAll('.url-text').forEach(el => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (e.ctrlKey || e.metaKey) {
+            window.open(el.dataset.url, '_blank');
+          }
+        });
+      });
+
+      tbody.querySelectorAll('.mark-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const num = parseInt(btn.dataset.num);
+          const entry = entries.find(e => e.num === num);
+          if (entry) {
+            entry.marked = !entry.marked;
+            if (currentFilePath) saveStateToStorage(currentFilePath);
+            renderTable();
+          }
+        });
+      });
+
+      tbody.querySelectorAll('.hide-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const num = parseInt(btn.dataset.num);
+          const entry = entries.find(e => e.num === num);
+          if (entry) {
+            entry.hidden = !entry.hidden;
+            if (currentFilePath) saveStateToStorage(currentFilePath);
+            renderTable();
+          }
+        });
+      });
+
+      tbody.querySelectorAll('.body-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const panel = e.target.closest('.detail-body');
+          const target = e.target.dataset.tab;
+          
+          panel.querySelectorAll('.body-tab').forEach(t => t.classList.remove('active'));
+          panel.querySelectorAll('.body-pane').forEach(p => p.style.display = 'none');
+          
+          e.target.classList.add('active');
+          panel.querySelector(`.body-pane[data-pane="${target}"]`).style.display = 'block';
+        });
+      });
+
+      renderStats();
+      if (showFilters) {
+        renderFilters();
+      }
+      renderHeader();
+      encodeStateToUrl();
+      
+      requestAnimationFrame(() => {
+        document.querySelectorAll('.detail-body').forEach(body => {
+          body.style.height = (window.innerHeight * 0.7) + 'px';
+        });
+      });
+    }
+
+    function renderCell(entry, key, content) {
+      const col = columns.find(c => c.key === key);
+      return `<td class="${col?.width || ''}">${content}</td>`;
+    }
+
+    function renderDetailRow(entry, colCount = visibleColumns.length) {
+      const raw = entry.raw;
+      const req = raw.request || {};
+      const res = raw.response || {};
+      const timings = raw.timings || {};
+      
+      const timingTotal = entry.time || 1;
+      const timingBars = [
+        { key: 'blocked', label: 'Blocked', value: timings.blocked || 0, class: 'timing-blocked' },
+        { key: 'dns', label: 'DNS', value: timings.dns > 0 ? timings.dns : 0, class: 'timing-dns' },
+        { key: 'ssl', label: 'SSL', value: timings.ssl > 0 ? timings.ssl : 0, class: 'timing-ssl' },
+        { key: 'connect', label: 'Connect', value: timings.connect > 0 ? timings.connect : 0, class: 'timing-connect' },
+        { key: 'send', label: 'Send', value: timings.send > 0 ? timings.send : 0, class: 'timing-send' },
+        { key: 'wait', label: 'Wait', value: timings.wait > 0 ? timings.wait : 0, class: 'timing-wait' },
+        { key: 'receive', label: 'Receive', value: timings.receive > 0 ? timings.receive : 0, class: 'timing-receive' }
+      ];
+
+      const formatHeaders = (headers) => {
+        if (!headers || !Array.isArray(headers)) return '[]';
+        return headers.map(h => `  "${h.name}": "${escapeHtml(h.value)}"`).join('\n');
+      };
+
+      let bodyPane = '<div class="detail-content">No response body</div>';
+      
+      if (entry.isImage && entry.imageDataUrl) {
+        bodyPane = `
+          <div class="body-pane" style="display: block;">
+            <div class="image-preview">
+              <img src="${entry.imageDataUrl}" alt="${entry.contentType}" title="${escapeHtml(entry.url)}">
+            </div>
+          </div>
+        `;
+      } else if (entry.responseBodyText) {
+        const bodySize = entry.responseBodyText.length;
+        const truncated = bodySize > 50000;
+        const displayText = truncated ? entry.responseBodyText.slice(0, 50000) + '\n\n... [truncated, full size: ' + formatSize(bodySize) + ']' : entry.responseBodyText;
+        
+        if (entry.isJson) {
+          let jsonObj;
+          try {
+            jsonObj = JSON.parse(entry.responseBodyText);
+          } catch (e) {
+            jsonObj = entry.responseBodyText;
+          }
+          
+          const prettyJson = typeof jsonObj === 'object' ? JSON.stringify(jsonObj, null, 2) : entry.responseBodyText;
+          const truncatedJson = truncated ? prettyJson.slice(0, 50000) + '\n\n... [truncated]' : prettyJson;
+          
+          bodyPane = `
+            <div class="body-tabs">
+              <button class="body-tab active" data-tab="pretty">Pretty</button>
+              <button class="body-tab" data-tab="raw">Raw</button>
+            </div>
+            <div class="body-pane" data-pane="pretty" style="display: block;">
+              <div class="detail-content json-content">${syntaxHighlightJson(truncatedJson)}</div>
+            </div>
+            <div class="body-pane" data-pane="raw" style="display: none;">
+              <div class="detail-content">${highlightGuids(displayText)}</div>
+            </div>
+          `;
+        } else {
+          bodyPane = `
+            <div class="body-pane" data-pane="raw" style="display: block;">
+              <div class="detail-content">${highlightGuids(displayText)}</div>
+            </div>
+          `;
+        }
+      }
+
+      return `
+        <tr class="detail-row">
+          <td colspan="${colCount}">
+            <div class="detail-panel">
+              <div class="detail-layout">
+                <div class="detail-headers">
+                  <div class="detail-section">
+                    <div class="detail-title">Request Headers</div>
+                    <div class="detail-content">{\n${formatHeaders(req.headers)}\n}</div>
+                  </div>
+                  <div class="detail-section">
+                    <div class="detail-title">Response Headers</div>
+                    <div class="detail-content">{\n${formatHeaders(res.headers)}\n}</div>
+                  </div>
+                  <div class="detail-section">
+                    <div class="detail-title">
+                      Timings (Total: ${formatDuration(entry.time)})
+                      <div class="timing-bar" style="flex: 1; margin-left: 12px; max-width: 300px;">
+                        ${timingBars.map(t => `
+                          <div class="timing-segment ${t.class}" 
+                               style="width: ${Math.max((t.value / timingTotal) * 100, t.value > 0 ? 1 : 0)}%"
+                               title="${t.label}: ${formatDuration(t.value)}"></div>
+                        `).join('')}
+                      </div>
+                    </div>
+                    <div style="display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
+                      ${timingBars.filter(t => t.value > 0).map(t => `
+                        <span style="font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text-secondary);">
+                          <span class="timing-segment ${t.class}" style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px;"></span>
+                          ${t.label}: ${formatDuration(t.value)}
+                        </span>
+                      `).join('')}
+                    </div>
+                  </div>
+                </div>
+                <div class="detail-body">
+                  <div class="detail-title">Response Body ${entry.isJson ? '(JSON detected)' : ''}</div>
+                  ${bodyPane}
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function loadHarFile(file) {
+      errorContainer.innerHTML = '';
+      
+      const filePath = file.webkitRelativePath || file.name;
+      currentFilePath = filePath;
+      
+      const parts = filePath.replace(/\\/g, '/').split('/');
+      const fileName = parts.pop();
+      const folder = parts.length > 0 ? parts.pop() : '';
+      document.getElementById('fileInfo').textContent = folder ? `${folder}/${fileName}` : fileName;
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const json = JSON.parse(e.target.result);
+          harData = json;
+          entries = parseHar(json);
+          filters = {};
+          filters.showJson = false;
+          sortColumn = 'startedDateTime';
+          sortDirection = 'asc';
+          visibleColumns = allColumns.map(c => c.key);
+          
+          const savedState = loadStateFromStorage(filePath);
+          if (savedState) {
+            filters = savedState.filters || filters;
+            savedState.markedRows?.forEach(num => {
+              const entry = entries.find(e => e.num === num);
+              if (entry) entry.marked = true;
+            });
+            savedState.hiddenRows?.forEach(num => {
+              const entry = entries.find(e => e.num === num);
+              if (entry) entry.hidden = true;
+            });
+          }
+          
+          decodeStateFromUrl();
+          
+          dropZone.style.display = 'none';
+          content.style.display = 'flex';
+          clearCacheBtn.style.display = 'inline-flex';
+          
+          renderHeader();
+          renderFilters();
+          renderTable();
+          
+        } catch (err) {
+          showError('Failed to parse HAR file: ' + err.message);
+        }
+      };
+      reader.onerror = () => showError('Failed to read file');
+      reader.readAsText(file);
+    }
+
+    function showError(message) {
+      errorContainer.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
+    }
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    loadFileBtn.addEventListener('click', () => fileInput.click());
+    
+    const clearCacheBtn = document.getElementById('clearCacheBtn');
+    clearCacheBtn.addEventListener('click', () => {
+      if (currentFilePath && confirm(`Clear cached data for "${currentFilePath}"?\n\nThis will remove all saved filters, marked rows, and hidden rows.`)) {
+        const key = getStorageKey(currentFilePath);
+        localStorage.removeItem(key);
+        renderTable();
+      }
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) loadHarFile(file);
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragging');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragging');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragging');
+      const file = e.dataTransfer.files[0];
+      if (file) loadHarFile(file);
+    });
+
+    showFiltersBtn.addEventListener('click', () => {
+      showFilters = !showFilters;
+      filterRow.style.display = showFilters ? 'flex' : 'none';
+      showFiltersBtn.classList.toggle('active', showFilters);
+      if (showFilters) {
+        renderFilters();
+        requestAnimationFrame(() => {
+          syncFilterColumnWidths();
+        });
+      }
+    });
+    showFiltersBtn.classList.add('active');
+
+    window.addEventListener('resize', () => {
+      if (showFilters) {
+        syncFilterColumnWidths();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && expandedRow !== null) {
+        expandedRow = null;
+        renderTable();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        showFilters = true;
+        filterRow.style.display = 'flex';
+        showFiltersBtn.classList.add('active');
+        const firstInput = filterRow.querySelector('input');
+        if (firstInput) {
+          firstInput.focus();
+          syncFilterColumnWidths();
+        }
+      }
+      
+      if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
+        const filtered = getFilteredEntries();
+        const sorted = getSortedEntries(filtered);
+        const visibleEntries = sorted.filter(entry => !entry.hidden);
+        
+        if (visibleEntries.length === 0) return;
+        
+        if (selectedRow === null) {
+          selectedRow = visibleEntries[0].num;
+        } else {
+          const currentIndex = visibleEntries.findIndex(entry => entry.num === selectedRow);
+          if (currentIndex < visibleEntries.length - 1) {
+            selectedRow = visibleEntries[currentIndex + 1].num;
+          }
+        }
+        expandedRow = selectedRow;
+        renderTable();
+        
+        const selectedEl = tbody.querySelector(`tr[data-num="${selectedRow}"]`);
+        if (selectedEl) {
+          const tableContainer = document.querySelector('.table-container');
+          requestAnimationFrame(() => {
+            const rowHeight = selectedEl.offsetHeight;
+            const targetScroll = selectedEl.offsetTop - rowHeight - 1;
+            tableContainer.scrollTop = Math.max(0, targetScroll);
+          });
+        }
+      }
+      
+      if (e.key === 'k' || e.key === 'K') {
+        e.preventDefault();
+        const filtered = getFilteredEntries();
+        const sorted = getSortedEntries(filtered);
+        const visibleEntries = sorted.filter(entry => !entry.hidden);
+        
+        if (visibleEntries.length === 0) return;
+        
+        if (selectedRow === null) {
+          selectedRow = visibleEntries[visibleEntries.length - 1].num;
+        } else {
+          const currentIndex = visibleEntries.findIndex(entry => entry.num === selectedRow);
+          if (currentIndex > 0) {
+            selectedRow = visibleEntries[currentIndex - 1].num;
+          }
+        }
+        expandedRow = selectedRow;
+        renderTable();
+        
+        const selectedEl = tbody.querySelector(`tr[data-num="${selectedRow}"]`);
+        if (selectedEl) {
+          const tableContainer = document.querySelector('.table-container');
+          requestAnimationFrame(() => {
+            const rowHeight = selectedEl.offsetHeight;
+            const targetScroll = selectedEl.offsetTop - rowHeight - 1;
+            tableContainer.scrollTop = Math.max(0, targetScroll);
+          });
+        }
+      }
+    });
+
+    if (entries.length > 0) {
+      renderTable();
+    }
+  </script>
+</body>
+</html>
