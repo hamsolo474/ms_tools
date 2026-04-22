@@ -81,6 +81,32 @@
       font-family: 'JetBrains Mono', monospace;
     }
 
+    .header-search {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+    }
+
+    .header-search input {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-primary);
+      width: 300px;
+    }
+
+    .header-search input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .header-search input::placeholder {
+      color: var(--text-muted);
+    }
+
     .header-actions {
       display: flex;
       align-items: center;
@@ -850,6 +876,11 @@
       font-weight: 500;
     }
 
+    .guid-value {
+      background: var(--guid-bg);
+      color: var(--guid-color);
+    }
+
     .timing-bar {
       display: flex;
       height: 8px;
@@ -914,10 +945,13 @@
     <header class="header">
       <h1>HAR Reader</h1>
       <span class="file-info" id="fileInfo"></span>
+      <div class="header-search">
+        <input type="text" id="searchInput" placeholder="Search all fields...">
+      </div>
       <div class="header-actions">
         <div style="position: relative;">
           <button class="btn" id="columnsBtn">
-            <span>☰</span> Columns
+            <span>鈽?/span> Columns
           </button>
           <div class="columns-dropdown" id="columnsDropdown">
             <div class="columns-dropdown-title">Visible Columns</div>
@@ -925,20 +959,20 @@
           </div>
         </div>
         <button class="btn" id="showFiltersBtn">
-          <span>🔍</span> Toggle Filters
+          <span>馃攳</span> Toggle Filters
         </button>
         <button class="btn btn-primary" id="loadFileBtn">
-          <span>📂</span> Load HAR File
+          <span>馃搨</span> Load HAR File
         </button>
         <button class="btn" id="clearCacheBtn" style="display: none;">
-          <span>🗑</span> Clear Cache
+          <span>馃棏</span> Clear Cache
         </button>
       </div>
       <input type="file" id="fileInput" class="file-input" accept=".har,application/json">
     </header>
 
     <div id="dropZone" class="drop-zone">
-      <div class="drop-zone-icon">📋</div>
+      <div class="drop-zone-icon">馃搵</div>
       <div class="drop-zone-text">Drop a HAR file here or click to browse</div>
       <div class="drop-zone-hint">Supports .har files and JSON files</div>
     </div>
@@ -960,8 +994,8 @@
   <script>
     const allColumns = [
       { key: 'num', label: '#', width: 'col-num', sortable: true, description: 'Row number', resizable: false },
-      { key: 'mark', label: '★', width: 'col-mark', sortable: false, description: 'Mark/Favorite', resizable: false },
-      { key: 'hide', label: '👁', width: 'col-hide', sortable: false, description: 'Hide row', resizable: false },
+      { key: 'mark', label: '鈽?, width: 'col-mark', sortable: false, description: 'Mark/Favorite', resizable: false },
+      { key: 'hide', label: '馃憗', width: 'col-hide', sortable: false, description: 'Hide row', resizable: false },
       { key: 'status', label: 'Status', width: 'col-status', sortable: true, numeric: true, description: 'HTTP status code' },
       { key: 'method', label: 'Method', width: 'col-method', sortable: true, description: 'HTTP method (GET, POST, etc.)' },
       { key: 'protocol', label: 'Protocol', width: 'col-protocol', sortable: true, description: 'Protocol (http/https)' },
@@ -1015,6 +1049,7 @@
     const thead = document.getElementById('thead');
     const tbody = document.getElementById('tbody');
     const errorContainer = document.getElementById('errorContainer');
+    const searchInput = document.getElementById('searchInput');
 
     function parseHar(json) {
       if (!json.log || !json.log.entries) {
@@ -1255,20 +1290,31 @@
       let inner = trimmed;
       
       if (trimmed.startsWith('-')) {
+        const afterDash = trimmed.slice(1).trim();
+        if (!afterDash) return { type: 'all', exclude: false, value: null };
+        
         exclude = true;
-        inner = trimmed.slice(1).trim();
-        if (!inner) return { type: 'all', exclude: false, value: null };
+        inner = afterDash;
       }
       
       if (inner.includes('|')) {
-        const parts = inner.split('|').map(p => p.trim()).filter(p => p);
+        const parts = inner.split(/\s*\|\s*/).map(p => p.trim()).filter(p => p);
         const subFilters = parts.map(p => parseSingleFilter(p));
+        if (exclude) {
+          subFilters.forEach(f => f.exclude = true);
+        }
         return { type: 'compound', operator: '|', exclude, parts: subFilters };
       }
       
       if (inner.includes('&')) {
-        const parts = inner.split('&').map(p => p.trim()).filter(p => p);
-        const subFilters = parts.map(p => parseSingleFilter(p));
+        const parts = inner.split(/\s*&\s*/).map(p => p.trim()).filter(p => p);
+        const subFilters = parts.map(p => {
+          const subParse = parseSingleFilter(p);
+          if (exclude) {
+            subParse.exclude = true;
+          }
+          return subParse;
+        });
         return { type: 'compound', operator: '&', exclude, parts: subFilters };
       }
       
@@ -1278,17 +1324,26 @@
     }
     
     function parseSingleFilter(filterStr) {
-      const booleanMatch = filterStr.match(/^(1|y|true)$/i);
+      let localExclude = false;
+      let innerStr = filterStr.trim();
+      
+      if (innerStr.startsWith('-')) {
+        localExclude = true;
+        innerStr = innerStr.slice(1).trim();
+        if (!innerStr) return { type: 'string', exclude: false, value: filterStr };
+      }
+      
+      const booleanMatch = innerStr.match(/^(1|y|true)$/i);
       if (booleanMatch) {
-        return { type: 'boolean', exclude: false, value: true };
+        return { type: 'boolean', exclude: localExclude, value: true };
       }
       
-      const booleanFalseMatch = filterStr.match(/^(0|n|false)$/i);
+      const booleanFalseMatch = innerStr.match(/^(0|n|false)$/i);
       if (booleanFalseMatch) {
-        return { type: 'boolean', exclude: false, value: false };
+        return { type: 'boolean', exclude: localExclude, value: false };
       }
       
-      const opMatch = filterStr.match(/^(>=|<=|>|<|=)?(.+)$/);
+      const opMatch = innerStr.match(/^(>=|<=|>|<|=)?(.+)$/);
       if (opMatch) {
         const op = opMatch[1] || null;
         const val = opMatch[2].trim();
@@ -1296,17 +1351,17 @@
         if (op) {
           const numVal = parseFloat(val);
           if (!isNaN(numVal)) {
-            return { type: 'numeric', exclude: false, operator: op, value: numVal };
+            return { type: 'numeric', exclude: localExclude, operator: op, value: numVal };
           }
         }
         
-        const numVal = parseFloat(filterStr);
+        const numVal = parseFloat(innerStr);
         if (!isNaN(numVal)) {
-          return { type: 'numeric', exclude: false, operator: '=', value: numVal };
+          return { type: 'numeric', exclude: localExclude, operator: '=', value: numVal };
         }
       }
       
-      return { type: 'string', exclude: false, value: filterStr };
+      return { type: 'string', exclude: localExclude, value: innerStr };
     }
 
     function applyFilter(cellValue, filter, columnKey) {
@@ -1314,13 +1369,12 @@
       
       if (filter.type === 'compound') {
         const results = filter.parts.map(part => applySingleFilter(cellValue, part, columnKey));
-        let matches;
+        
         if (filter.operator === '|') {
-          matches = results.some(r => r);
+          return results.some(r => r);
         } else {
-          matches = results.every(r => r);
+          return results.every(r => r);
         }
-        return filter.exclude ? !matches : matches;
       }
       
       return applySingleFilter(cellValue, filter, columnKey);
@@ -1364,6 +1418,23 @@
 
     function getFilteredEntries() {
       return entries.filter(entry => {
+        const searchTerm = searchInput.value.trim();
+        if (searchTerm) {
+          const term = searchTerm.toLowerCase();
+          const searchableFields = [
+            entry.url, entry.host, entry.path, entry.method, entry.protocol,
+            entry.status, entry.resourceType, entry.contentType, entry.httpVersion,
+            entry.serverIPAddress, entry.priority, entry.connection, entry.pageref,
+            entry.responseBodyText, String(entry.requestSize), String(entry.responseSize),
+            String(entry.time), String(entry.delta)
+          ].filter(f => f !== null && f !== undefined && f !== '-');
+          
+          const matchesSearch = searchableFields.some(field => 
+            String(field).toLowerCase().includes(term)
+          );
+          if (!matchesSearch) return false;
+        }
+        
         if (filters.showJson && !entry.isJson) {
           return false;
         }
@@ -1488,7 +1559,7 @@
         <tr>
           ${visibleCols.map(col => {
             const isSorted = sortColumn === col.key;
-            const sortIcon = isSorted ? (sortDirection === 'asc' ? '▲' : '▼') : '';
+            const sortIcon = isSorted ? (sortDirection === 'asc' ? '鈻? : '鈻?) : '';
             const width = columnWidths[col.key] || col.width;
             return `<th class="${col.width} ${isSorted ? 'sorted' : ''}" data-column="${col.key}" style="width: ${width}">
               ${col.label}<span class="sort-icon">${sortIcon}</span>
@@ -1558,6 +1629,7 @@
       }
       hints.push('-prefix to exclude');
       hints.push('Use | for OR, & for AND');
+      hints.push('Chain: -js&-css excludes both');
       return hints.join('<br>');
     }
 
@@ -1646,22 +1718,22 @@
         <div class="stat">Duration: <span class="stat-value">${formatDuration(totalDuration)}</span></div>
         <span class="keyboard-hint">J/K to navigate</span>
         <button class="stat-btn stat-btn-2xx ${currentStatus === '2xx' ? 'active active-2xx' : ''}" data-status="2xx" title="Filter by 2xx status">
-          <span>2xx</span> ✓ <span class="stat-value">${statusCounts['2xx'] || 0}</span>
+          <span>2xx</span> 鉁?<span class="stat-value">${statusCounts['2xx'] || 0}</span>
         </button>
         <button class="stat-btn stat-btn-3xx ${currentStatus === '3xx' ? 'active active-3xx' : ''}" data-status="3xx" title="Filter by 3xx status">
-          <span>3xx</span> ↪ <span class="stat-value">${statusCounts['3xx'] || 0}</span>
+          <span>3xx</span> 鈫?<span class="stat-value">${statusCounts['3xx'] || 0}</span>
         </button>
         <button class="stat-btn stat-btn-4xx ${currentStatus === '4xx' ? 'active active-4xx' : ''}" data-status="4xx" title="Filter by 4xx status">
-          <span>4xx</span> ⚠ <span class="stat-value">${statusCounts['4xx'] || 0}</span>
+          <span>4xx</span> 鈿?<span class="stat-value">${statusCounts['4xx'] || 0}</span>
         </button>
         <button class="stat-btn stat-btn-5xx ${currentStatus === '5xx' ? 'active active-5xx' : ''}" data-status="5xx" title="Filter by 5xx status">
-          <span>5xx</span> ✗ <span class="stat-value">${statusCounts['5xx'] || 0}</span>
+          <span>5xx</span> 鉁?<span class="stat-value">${statusCounts['5xx'] || 0}</span>
         </button>
         <button class="stat-btn stat-btn-json ${currentJson ? 'active active-json' : ''}" data-json="true" title="Filter by JSON responses">
           <span>JSON</span> { } <span class="stat-value">${jsonCount}</span>
         </button>
-        ${entries.some(e => e.hidden) ? '<button class="stat-btn stat-btn-clear" id="unhideAllBtn" title="Unhide all rows">👁 Unhide All</button>' : ''}
-        ${hasActiveFilters ? '<button class="stat-btn stat-btn-clear" id="clearAllBtn" title="Clear all filters and restore sort by Start Time">✕ Clear All</button>' : ''}
+        ${entries.some(e => e.hidden) ? '<button class="stat-btn stat-btn-clear" id="unhideAllBtn" title="Unhide all rows">馃憗 Unhide All</button>' : ''}
+        ${hasActiveFilters ? '<button class="stat-btn stat-btn-clear" id="clearAllBtn" title="Clear all filters and restore sort by Start Time">鉁?Clear All</button>' : ''}
       `;
 
       const clearBtn = document.getElementById('clearAllBtn');
@@ -1703,9 +1775,9 @@
               filters.status = '';
             } else {
               const ranges = {
-                '2xx': '>=200 <300',
-                '3xx': '>=300 <400',
-                '4xx': '>=400 <500',
+                '2xx': '>=200&<300',
+                '3xx': '>=300&<400',
+                '4xx': '>=400&<500',
                 '5xx': '>=500'
               };
               filters.status = ranges[status];
@@ -1765,13 +1837,7 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
       
-      const withGuids = escaped.replace(guidRegex, (match) => {
-        return `<span class="guid">${match}</span>`;
-      });
-      
-      const withJson = withGuids.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
-        if (match.startsWith('<span class="guid">')) return match;
-        
+      const withJson = escaped.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
         let cls = 'json-number';
         if (/^"/.test(match)) {
           if (/:$/.test(match)) {
@@ -1789,7 +1855,17 @@
         return `<span class="${cls}">${match}</span>`;
       });
       
-      return withJson.replace(/([{}\[\],])/g, '<span class="json-punctuation">$1</span>');
+      const withPunctuation = withJson.replace(/([{}\[\],])/g, '<span class="json-punctuation">$1</span>');
+      
+      const withGuids = withPunctuation.replace(/<span class="json-string">(".*?")<\/span>/gs, (full, content) => {
+        const guidMatch = content.match(guidRegex);
+        if (guidMatch) {
+          return `<span class="json-string guid-value">${content}</span>`;
+        }
+        return full;
+      });
+      
+      return withGuids;
     }
 
     function renderTable() {
@@ -1829,8 +1905,8 @@
         return `
           <tr class="${rowClass}" data-num="${entry.num}">
             ${renderCellForVisible(entry, 'num', `<span class="cell-mono">${entry.num}</span>`)}
-            ${renderCellForVisible(entry, 'mark', `<button class="mark-btn ${entry.marked ? 'marked' : ''}" data-num="${entry.num}" title="Mark/Favorite">${entry.marked ? '★' : '☆'}</button>`)}
-            ${renderCellForVisible(entry, 'hide', `<button class="hide-btn" data-num="${entry.num}" title="Hide row">✕</button>`)}
+            ${renderCellForVisible(entry, 'mark', `<button class="mark-btn ${entry.marked ? 'marked' : ''}" data-num="${entry.num}" title="Mark/Favorite">${entry.marked ? '鈽? : '鈽?}</button>`)}
+            ${renderCellForVisible(entry, 'hide', `<button class="hide-btn" data-num="${entry.num}" title="Hide row">鉁?/button>`)}
             ${renderCellForVisible(entry, 'status', `<span class="status status-${entry.statusClass}" title="${entry.status}: ${getStatusDescription(entry.status)}">${entry.status || '-'}</span>`)}
             ${renderCellForVisible(entry, 'method', `<span class="method">${entry.method}</span>`)}
             ${renderCellForVisible(entry, 'protocol', `<span class="cell-mono">${entry.protocol.toUpperCase()}</span>`)}
@@ -2136,6 +2212,11 @@
       if (file) loadHarFile(file);
     });
 
+    searchInput.addEventListener('input', () => {
+      syncFilterColumnWidths();
+      renderTable();
+    });
+
     showFiltersBtn.addEventListener('click', () => {
       showFilters = !showFilters;
       filterRow.style.display = showFilters ? 'flex' : 'none';
@@ -2160,19 +2241,10 @@
         expandedRow = null;
         renderTable();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        e.preventDefault();
-        showFilters = true;
-        filterRow.style.display = 'flex';
-        showFiltersBtn.classList.add('active');
-        const firstInput = filterRow.querySelector('input');
-        if (firstInput) {
-          firstInput.focus();
-          syncFilterColumnWidths();
-        }
-      }
       
-      if (e.key === 'j' || e.key === 'J') {
+      const isTextInput = e.target.tagName === 'INPUT' && (e.target.type === 'text' || e.target.type === 'search' || e.target.tagName === 'TEXTAREA');
+      
+      if ((e.key === 'j' || e.key === 'J') && !isTextInput) {
         e.preventDefault();
         const filtered = getFilteredEntries();
         const sorted = getSortedEntries(filtered);
@@ -2202,7 +2274,7 @@
         }
       }
       
-      if (e.key === 'k' || e.key === 'K') {
+      if ((e.key === 'k' || e.key === 'K') && !isTextInput) {
         e.preventDefault();
         const filtered = getFilteredEntries();
         const sorted = getSortedEntries(filtered);
