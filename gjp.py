@@ -109,10 +109,14 @@ C:\Users\v-micgilmore\Documents\Customer\2xxxxxxxxxxxxxx9\PBIDesktopDiagnosticIn
                         action = "store_true",
                         default=False,
                         help="only return unique rows")
-    parser.add_argument('--unique-count', '--count-unique', "-c",
+    parser.add_argument('--unique-count', '--count-unique', "--cu", "--uc", "-c",
                         action = "store_true",
                         default=False,
                         help="similar to sort | uniq -c ")
+    parser.add_argument('--greater-than', '--gt'
+                        action = "store_int",
+                        default=0,
+                        help="only show count greater than X")                    
     parser.add_argument('--print-long-lines', "-p",
                         action = "store_true",
                         default=False,
@@ -173,8 +177,12 @@ C:\Users\v-micgilmore\Documents\Customer\2xxxxxxxxxxxxxx9\PBIDesktopDiagnosticIn
             
     if args.unique == True or args.unique_count == True:
         for k, v in sorted(unique.items(), key=lambda x: x[1], reverse=True):
-            if args.unique_count: print(f'{v}', end='\t')
-            print(k)
+            if args.unique_count: 
+                if v > args.greater_than:
+                    print(f'{v}', end='\t')
+                    print(k)
+            else:
+                print(k)
             results = True
             
     if args.keys:
