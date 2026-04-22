@@ -73,7 +73,7 @@ class GUIDRow(ttk.Frame):
     def get_html_for_word(self):
         anchor = self.get_anchor_text() or self.get_label()
         url = self.get_url()
-        return f'{anchor}: {self.guid}<a href="{url}">{anchor}</a>'
+        return f'{anchor}: {self.guid} <a href="{url}">{anchor}</a>'
 
 
 class URLParserApp:
