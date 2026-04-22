@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import urllib.parse
 import pyperclip
+import subprocess
 
 
 class GUIDRow(ttk.Frame):
@@ -63,14 +64,16 @@ class GUIDRow(ttk.Frame):
     def get_markdown_link(self):
         anchor = self.get_anchor_text() or self.get_label()
         url = self.get_url()
-        return f"[{anchor}]({url})"
+        return f'<a href="{url}">{anchor}</a>'
 
     def get_display_line(self):
         label = self.get_label()
         return f"{label}: {self.guid}"
 
-    def update_preview(self):
-        pass
+    def get_html_for_word(self):
+        anchor = self.get_anchor_text() or self.get_label()
+        url = self.get_url()
+        return f'{anchor}: {self.guid}<a href="{url}">{anchor}</a>'
 
 
 class URLParserApp:
@@ -100,6 +103,8 @@ class URLParserApp:
         "dashboard": ("Dashboard", "Fabric Service Portal"),
         "dataflows": ("Dataflow", "Fabric Service Portal"),
         "dataflow": ("Dataflow", "Fabric Service Portal"),
+        "dataflow-gen2": ("Dataflow", "Fabric Service Portal"),
+        "dataflows-gen2": ("Dataflow", "Fabric Service Portal"),
         "kqldatabases": ("KQL Database", "Fabric Service Portal"),
         "kqldatabase": ("KQL Database", "Fabric Service Portal"),
         "kqldashboards": ("KQL Dashboard", "Fabric Service Portal"),
@@ -257,12 +262,47 @@ class URLParserApp:
         if not self.guid_rows:
             messagebox.showwarning("No Output", "No GUIDs parsed. Please parse a URL first.")
             return
-        parts = []
+
+        html_parts = []
         for row in self.guid_rows:
-            parts.append(f"{row.get_display_line()} {row.get_markdown_link()}")
-        text = "\n".join(parts)
-        pyperclip.copy(text)
-        #messagebox.showinfo("Copied", "All data copied to clipboard!")
+            html_parts.append(row.get_html_for_word())
+        html_content = "<br>".join(html_parts)
+
+        self._copy_html_to_clipboard(html_content)
+
+    def _copy_html_to_clipboard(self, content):
+        import subprocess
+        
+        cf_header = 'Version:0.9\n'
+        cf_header += 'StartHTML:00000000\n'
+        cf_header += 'EndHTML:00000000\n'
+        cf_header += 'StartFragment:00000000\n'
+        cf_header += 'EndFragment:00000000\n'
+        
+        html_prefix = '<html><head><meta charset="UTF-8"></head><body>'
+        html_suffix = '</body></html>'
+        
+        start_frag_tag = '<!--StartFragment-->'
+        end_frag_tag = '<!--EndFragment-->'
+        
+        start_html_offset = len(cf_header)
+        start_frag_offset = start_html_offset + len(html_prefix) + len(start_frag_tag)
+        end_frag_offset = start_frag_offset + len(content)
+        end_html_offset = end_frag_offset + len(end_frag_tag) + len(html_suffix)
+        
+        cf_header = (f'Version:0.9\n'
+                   f'StartHTML:{start_html_offset:08d}\n'
+                   f'EndHTML:{end_html_offset:08d}\n'
+                   f'StartFragment:{start_frag_offset:08d}\n'
+                   f'EndFragment:{end_frag_offset:08d}\n')
+        
+        cf_html = cf_header + html_prefix + start_frag_tag + content + end_frag_tag + html_suffix
+        
+        cmd = f'''$html = @'
+{cf_html}
+'@; Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::SetText($html, [System.Windows.Forms.TextDataFormat]::Html)'''
+        
+        subprocess.run(['powershell', '-Command', cmd], capture_output=True)
 
 
 def main():
