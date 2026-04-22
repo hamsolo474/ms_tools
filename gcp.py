@@ -139,7 +139,7 @@ if __name__ == '__main__':
                         action = "store_true",
                         default=False,
                         help="similar to sort | uniq -c ")
-    parser.add_argument('--greater-than', '--gt'
+    parser.add_argument('--greater-than', '--gt',
                         action = "store_int",
                         default=0,
                         help="only show count greater than X")   
